@@ -8,7 +8,6 @@ from data import player_json_to_df
 import plotly.graph_objects as go
 import streamlit as st
 import json
-import time
 
 st.set_page_config(
     page_title='Home',
@@ -28,7 +27,7 @@ def load_and_process_data(json_file):
     df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
     df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
     df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
-    df['team'] = df['tid'].map(dict([(teams['tid'], teams['region']) for teams in r_json['teams']]))
+    df['team'] = df['tid'].map(dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']]))
     return df
 
 
