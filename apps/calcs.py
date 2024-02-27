@@ -1,5 +1,4 @@
 import numpy as np
-import yaml
 import pandas as pd
 
 poly_under = np.load('./models/poly_under.npy')
