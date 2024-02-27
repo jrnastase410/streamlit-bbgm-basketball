@@ -1,4 +1,5 @@
-altair
 pandas
 streamlit
 boto3
+numpy
+plotly
