@@ -1,10 +1,20 @@
 print('Importing libraries...')
 
+import os
+print(os.getcwd())
+
 from calcs import *
 from data import player_json_to_df
 import plotly.graph_objects as go
 import streamlit as st
 import json
+import time
+
+st.set_page_config(
+    page_title='Home',
+    layout='wide'
+)
+
 
 
 @st.cache_data
@@ -102,7 +112,7 @@ def player_plot(pid, df):
             textposition='outside',
             textfont=dict(
                 color='rgb(252,100,45)',
-                size=14,
+                size=25,
             ),
         )
     )
@@ -122,7 +132,7 @@ def player_plot(pid, df):
             textposition='outside',
             textfont=dict(
                 color='rgb(0, 166, 153)',
-                size=14,
+                size=40,
             ),
         )
     )
@@ -156,23 +166,37 @@ def player_plot(pid, df):
     return fig
 
 
-print('Loading data...')
+def display_team(team, df):
+    team_df = df[df['team'] == team]
+    team_df = team_df[['player', 'pid', 'season', 'age', 'ovr', 'pot']]
+    return team_df
+
 
 # Upload json file
-json_file = st.file_uploader("Upload league JSON file", type=["json"])
+json_file = st.file_uploader('Upload a JSON file', type='json')
+if not json_file:
+    st.stop()
 
-if json_file is not None:
-    df = load_and_process_data(json_file)
-    df['player'] = df['firstName'] + ' ' + df['lastName']
-    player_name = st.text_input('Enter player name:')
-    team_name = st.text_input('Enter team name:')
-    matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
-        df['team'].str.contains(team_name, na=False, case=False))]
-    if not matching_players.empty:
-        selected_index = st.selectbox('Select a player:', matching_players.player)
-        selected_player = matching_players[matching_players.player == selected_index].iloc[0]
-        pid = selected_player['pid']
-        player_fig = player_plot(pid, df)
-        st.plotly_chart(player_fig, use_container_width=True)
-    else:
-        st.write('No matching players found.')
+df = load_and_process_data(json_file)
+df['player'] = df['firstName'] + ' ' + df['lastName']
+team_names = np.sort(df['team'].astype(str).unique())
+my_team = st.selectbox('Select your team:', team_names)
+if my_team:
+    team_df = display_team(my_team, df)
+    st.dataframe(
+        team_df.style\
+            .background_gradient(cmap='RdBu_r', vmin=0, vmax=100, subset=['ovr','pot'])\
+        .hide(axis='index'), use_container_width=True
+    )
+player_name = st.text_input('Enter player name:')
+team_name = st.text_input('Enter team name:')
+matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
+    df['team'].str.contains(team_name, na=False, case=False))]
+if not matching_players.empty:
+    selected_index = st.selectbox('Select a player:', matching_players.player)
+    selected_player = matching_players[matching_players.player == selected_index].iloc[0]
+    pid = selected_player['pid']
+    player_fig = player_plot(pid, df)
+    st.plotly_chart(player_fig, use_container_width=True)
+else:
+    st.write('No matching players found.')
