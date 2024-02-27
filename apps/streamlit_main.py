@@ -1,34 +1,25 @@
 print('Importing libraries...')
 
-from utils.calcs import *
-from utils.data import player_json_to_df
+from calcs import *
+from data import player_json_to_df
 import plotly.graph_objects as go
 import streamlit as st
+import json
 
-print('Loading data...')
 
-# Create a session using your AWS credentials
-r_json = st.file_uploader("Upload league JSON file", type=["json"])
-
-#with open('C:/Users/jrnas/Downloads/BBGM_League_2_2024_preseason.json', encoding='latin') as f:
-#    r_json = json.load(f)
-
-print('Processing data...')
-
-df = player_json_to_df(r_json)
-df = df[df.season == df[~df.salary.isna()].season.max()].drop_duplicates(['pid', 'season']).reset_index(drop=True)
-
-print('Processing statistics...')
-
-df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], 0.75), axis=1)
-df['rating_prog'] = df['results'].apply(lambda x: x['rating'])
-df['rating_upper_prog'] = df['results'].apply(lambda x: x['rating_upper'])
-df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
-df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
-df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
-df['team'] = df['tid'].map(dict([(teams['tid'], teams['region']) for teams in r_json['teams']]))
-
-print('Processing plots...')
+@st.cache_data
+def load_and_process_data(json_file):
+    r_json = json.load(json_file)
+    df = player_json_to_df(r_json)
+    df = df[df.season == df[~df.salary.isna()].season.max()].drop_duplicates(['pid', 'season']).reset_index(drop=True)
+    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], 0.75), axis=1)
+    df['rating_prog'] = df['results'].apply(lambda x: x['rating'])
+    df['rating_upper_prog'] = df['results'].apply(lambda x: x['rating_upper'])
+    df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
+    df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
+    df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
+    df['team'] = df['tid'].map(dict([(teams['tid'], teams['region']) for teams in r_json['teams']]))
+    return df
 
 
 def player_plot(pid, df):
@@ -164,5 +155,24 @@ def player_plot(pid, df):
 
     return fig
 
-player_fig = player_plot(int(input('Enter a pid: ')), df)
-st.plotly_chart(player_fig)
+
+print('Loading data...')
+
+# Upload json file
+json_file = st.file_uploader("Upload league JSON file", type=["json"])
+
+if json_file is not None:
+    df = load_and_process_data(json_file)
+    df['player'] = df['firstName'] + ' ' + df['lastName']
+    player_name = st.text_input('Enter player name:')
+    team_name = st.text_input('Enter team name:')
+    matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
+        df['team'].str.contains(team_name, na=False, case=False))]
+    if not matching_players.empty:
+        selected_index = st.selectbox('Select a player:', matching_players.player)
+        selected_player = matching_players[matching_players.player == selected_index].iloc[0]
+        pid = selected_player['pid']
+        player_fig = player_plot(pid, df)
+        st.plotly_chart(player_fig, use_container_width=True)
+    else:
+        st.write('No matching players found.')

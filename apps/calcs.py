@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 import pandas as pd
 
 poly_under = np.load('./models/poly_under.npy')
@@ -6,7 +7,7 @@ poly_over = np.load('./models/poly_over.npy')
 
 UNDER_OVER = 56.064
 
-progs = pd.read_parquet('../constants/progression.parquet')
+progs = pd.read_parquet('./constants/progression.parquet')
 for i in range(1, 10):
     progs[f'y_{i}'] = progs[f'y_{i}'] / (np.sum(progs[f'y_{i}']) / progs.age.nunique())
 
