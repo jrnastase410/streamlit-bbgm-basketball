@@ -1,25 +1,24 @@
-import numpy as np
-import pandas as pd
-import json
-
-import plotly.io as pio
-import plotly.graph_objects as go
-import streamlit as st
-import sys
-
-sys.path.append("..")
+print('Importing libraries...')
 
 from utils.calcs import *
 from utils.data import player_json_to_df
+import plotly.graph_objects as go
+import streamlit as st
 
-pio.templates.default = "plotly_dark"
-pio.renderers.default = "browser"
+print('Loading data...')
 
 # Create a session using your AWS credentials
 r_json = st.file_uploader("Upload league JSON file", type=["json"])
 
+#with open('C:/Users/jrnas/Downloads/BBGM_League_2_2024_preseason.json', encoding='latin') as f:
+#    r_json = json.load(f)
+
+print('Processing data...')
+
 df = player_json_to_df(r_json)
 df = df[df.season == df[~df.salary.isna()].season.max()].drop_duplicates(['pid', 'season']).reset_index(drop=True)
+
+print('Processing statistics...')
 
 df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], 0.75), axis=1)
 df['rating_prog'] = df['results'].apply(lambda x: x['rating'])
@@ -27,8 +26,9 @@ df['rating_upper_prog'] = df['results'].apply(lambda x: x['rating_upper'])
 df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
 df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
 df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
-
 df['team'] = df['tid'].map(dict([(teams['tid'], teams['region']) for teams in r_json['teams']]))
+
+print('Processing plots...')
 
 
 def player_plot(pid, df):
@@ -164,6 +164,5 @@ def player_plot(pid, df):
 
     return fig
 
-player_fig = player_plot(st.number_input('Player ID', min_value=0, max_value=df.pid.max(), value=0), df)
-
+player_fig = player_plot(int(input('Enter a pid: ')), df)
 st.plotly_chart(player_fig)
