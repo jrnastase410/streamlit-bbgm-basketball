@@ -182,11 +182,7 @@ team_names = np.sort(df['team'].astype(str).unique())
 my_team = st.selectbox('Select your team:', team_names)
 if my_team:
     team_df = display_team(my_team, df)
-    st.dataframe(
-        team_df.style\
-            .background_gradient(cmap='RdBu_r', vmin=0, vmax=100, subset=['ovr','pot'])\
-        .hide(axis='index'), use_container_width=True
-    )
+    st.dataframe(team_df, use_container_width=True)
 player_name = st.text_input('Enter player name:')
 team_name = st.text_input('Enter team name:')
 matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
