@@ -1,0 +1,15 @@
+Player Value Breakdown:
+
+    Inputs:
+
+        - Player
+
+    Outputs:
+
+        - Rating projection over time (w/ confidence interval)
+        - VORP over time
+        - Salary over time
+        - Surplus over time (w/ confidence interval)
+
+        - Total Contract Value
+        - Total Surplus Value
