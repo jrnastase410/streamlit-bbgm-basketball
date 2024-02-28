@@ -82,8 +82,9 @@ def load_and_process_data(json_file, ci_q=0.75):
 
     return df[~df.team.isna()].reset_index(), league_settings
 
+
 def select_teams(df):
-    teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA','Draft']
+    teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA', 'Draft']
     num_columns = 7
     num_per_column = len(teams_to_choose_from) // num_columns + 1
     columns = st.columns(num_columns)
@@ -97,6 +98,7 @@ def select_teams(df):
             if selected:
                 selected_teams.append(team)
     return selected_teams
+
 
 def filter_teams(df, selected_teams):
     if selected_teams != ['*All*']:
@@ -114,12 +116,13 @@ df_import['pot'] = df_import['rating_upper']
 
 selected_teams = select_teams(df_import)
 
-
 df_filtered = filter_teams(df_import, selected_teams)
 
 df_display = df_filtered[
-    ['player', 'pid', 'team', 'pos', 'age', 'ovr', 'pot', 'years', 'cap_hit', 'v1', 'v2', 'value']].sort_values('value',
+    ['player', 'pid', 'team', 'pos', 'age', 'ovr', 'pot', 'years', 'cap_hit', 'value', 'v1', 'v2']].sort_values('value',
                                                                                                                 ascending=False)
+
+trade_component = st.expander('Trade Component')
 
 
 def dataframe_with_selections(df):
