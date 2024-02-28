@@ -161,6 +161,8 @@ st.session_state['selected_pids'] = display_and_select_pids(df_display)
 if len(st.session_state['selected_pids']) > 0:
     trade_df = df_import[df_import.pid.isin(st.session_state['selected_pids'])]
     pivot_table = trade_df.pivot_table(index='player', columns='team', values='value', aggfunc='sum', fill_value=0)
+    # Sort rows to keep teams together
+    pivot_table = pivot_table.sort_values(by=pivot_table.columns.tolist(), ascending=True)
     # Add a column to show the total value for each team
     pivot_table.loc['Total'] = pivot_table.sum()
     st.dataframe(pivot_table)
