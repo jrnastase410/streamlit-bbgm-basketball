@@ -106,26 +106,11 @@ def filter_teams(df, selected_teams):
     else:
         return df
 
+def display_and_select_pids(df):
 
-json_file = st.file_uploader('Upload a JSON file', type='json')
-if not json_file:
-    st.stop()
+    if 'selected_pids' not in st.session_state:
+        st.session_state.selected_pids = []
 
-df_import, league_settings = load_and_process_data(json_file)
-df_import['pot'] = df_import['rating_upper']
-
-selected_teams = select_teams(df_import)
-
-df_filtered = filter_teams(df_import, selected_teams)
-
-df_display = df_filtered[
-    ['player', 'pid', 'team', 'pos', 'age', 'ovr', 'pot', 'years', 'cap_hit', 'value', 'v1', 'v2']].sort_values('value',
-                                                                                                                ascending=False)
-
-trade_component = st.expander('Trade Component')
-
-
-def dataframe_with_selections(df):
     df_with_selections = df.copy()
     df_with_selections.insert(0, "Select", False)
 
@@ -150,11 +135,34 @@ def dataframe_with_selections(df):
     )
 
     # Filter the dataframe using the temporary column, then drop the column
-    selected_rows = edited_df[edited_df.Select]
-    return selected_rows.drop('Select', axis=1)
+    selected_pids = list(set(list(edited_df[edited_df.Select]['pid'].values) + st.session_state.selected_pids))
+    return selected_pids
 
+json_file = st.file_uploader('Upload a JSON file', type='json')
+if not json_file:
+    st.stop()
 
-selection = dataframe_with_selections(df_display)
-selected_ids = selection['pid'].values
+df_import, league_settings = load_and_process_data(json_file)
+df_import['pot'] = df_import['rating_upper']
 
-[st.plotly_chart(player_plot(pid, df_import), use_container_width=True) for pid in selected_ids]
+selected_teams = select_teams(df_import)
+df_filtered = filter_teams(df_import, selected_teams)
+
+# Create a button to clear the selected pids
+if st.button('Clear selected players'):
+    st.session_state['selected_pids'] = []
+
+df_display = df_filtered[
+    ['player', 'pid', 'team', 'pos', 'age', 'ovr', 'pot', 'years', 'cap_hit', 'value', 'v1', 'v2']].sort_values('value',
+                                                                                                                ascending=False)
+
+st.session_state['selected_pids'] = display_and_select_pids(df_display)
+
+if len(st.session_state['selected_pids']) > 0:
+    trade_df = df_import[df_import.pid.isin(st.session_state['selected_pids'])]
+    pivot_table = trade_df.pivot_table(index='player', columns='team', values='value', aggfunc='sum', fill_value=0)
+    # Add a column to show the total value for each team
+    pivot_table.loc['Total'] = pivot_table.sum()
+    st.dataframe(pivot_table)
+
+[st.plotly_chart(player_plot(pid, df_import), use_container_width=True) for pid in st.session_state['selected_pids']]
