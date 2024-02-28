@@ -36,7 +36,7 @@ def calc_progs(ovr, age, q=0.9):
     x_rating = x_prog + ovr
     x_pred = np.array([ovr_to_vorp(x) for x in x_rating])
     x_value = np.clip(x_pred, 0, None)
-    x_cap_hit = 30 * x_value / 433.58
+    x_cap_hit = 30 * x_value / 312.77
 
     rating_dict = {}
     rating_uppper_dict = {}
@@ -48,7 +48,7 @@ def calc_progs(ovr, age, q=0.9):
     rating_uppper_dict[0] = ovr
     rating_lower_dict[0] = ovr
     vorp_added_dict[0] = ovr_to_vorp(ovr)
-    cap_value_dict[0] = 30 * np.maximum(0, vorp_added_dict[0]) / 433.58
+    cap_value_dict[0] = 30 * np.maximum(0, vorp_added_dict[0]) / 312.77
 
     progs_age = progs[progs.age == age]
     y_values = progs_age[[f'y_{i}' for i in range(1, 10)]].values

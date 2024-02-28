@@ -85,7 +85,7 @@ def load_and_process_data(json_file, ci_q=0.75):
 
 def select_teams(df):
     teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA', 'Draft']
-    num_columns = 4
+    num_columns = 7
     num_per_column = len(teams_to_choose_from) // num_columns + 1
     columns = st.columns(num_columns)
     selected_teams = []
@@ -135,7 +135,7 @@ def display_and_select_pids(df):
     )
 
     # Filter the dataframe using the temporary column, then drop the column
-    selected_pids = list(set(list(edited_df[edited_df.Select]['pid'].values) + st.session_state.selected_pids))
+    selected_pids = list(set(edited_df[edited_df.Select]['pid'].to_list() + st.session_state.selected_pids))
     return selected_pids
 
 json_file = st.file_uploader('Upload a JSON file', type='json')
