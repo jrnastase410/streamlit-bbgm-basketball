@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
+import pickle
 
 poly_under = np.load('./models/poly_under.npy')
 poly_over = np.load('./models/poly_over.npy')
+
+cap_hit_model = pickle.load(open('models/cap_hit_model.pkl', 'rb'))
 
 UNDER_OVER = 56.064
 
@@ -45,7 +48,7 @@ def calc_progs(ovr, age, q=0.9):
     rating_uppper_dict[0] = ovr
     rating_lower_dict[0] = ovr
     vorp_added_dict[0] = ovr_to_vorp(ovr)
-    cap_value_dict[0] = 30 * vorp_added_dict[0] / 433.58
+    cap_value_dict[0] = 30 * np.maximum(0,vorp_added_dict[0]) / 433.58
 
     for i in range(1, 10):
         y = progs[progs.age == age][f'y_{i}'].values
@@ -60,3 +63,39 @@ def calc_progs(ovr, age, q=0.9):
             'rating_lower': rating_lower_dict,
             'vorp_added': vorp_added_dict,
             'cap_value': cap_value_dict}
+
+def predict_cap_hit(row):
+    age = row['age']
+    rating_prog = row['rating_prog']
+    pot = row['rating_upper']
+
+    cap_hit_proj = {}
+    for year, rating in rating_prog.items():
+        # The model takes 'age', 'rating', and 'pot' as inputs
+        features = [age + year, rating, pot]
+        cap_hit_proj[year] = cap_hit_model.predict([features])[0]
+
+    return cap_hit_proj
+
+
+def fill_cap_hits(cap_hits, cap_hits_proj, division_factor):
+    filled_cap_hits = {}
+    null_count = 0
+    last_non_null_year = None
+
+    for i in range(10):
+        if cap_hits[i] is not None:
+            last_non_null_year = i
+
+    for i in range(10):
+        if cap_hits[i] is None:
+            if last_non_null_year is not None:
+                filled_cap_hits[i] = cap_hits_proj.get(last_non_null_year, 0) / (division_factor ** null_count)
+            else:
+                filled_cap_hits[i] = 0  # or some default value if no non-null year found
+            null_count += 1
+        else:
+            filled_cap_hits[i] = cap_hits[i]
+            null_count = 0  # Reset null count if non-None value is encountered
+
+    return filled_cap_hits

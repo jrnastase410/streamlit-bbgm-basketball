@@ -5,10 +5,10 @@ import os
 print(os.getcwd())
 
 from calcs import *
-from data import player_json_to_df
-import plotly.graph_objects as go
+from data import *
+from plots import *
 import streamlit as st
-import json
+from st_aggrid import *
 
 st.set_page_config(
     page_title='Home',
@@ -17,193 +17,141 @@ st.set_page_config(
 
 
 @st.cache_data
-def load_and_process_data(json_file):
+def load_and_process_data(json_file, ci_q=0.75):
     r_json = json.load(json_file)
+
+    league_settings = {
+        'season': r_json['gameAttributes']['season'],
+        'salary_cap': r_json['gameAttributes']['salaryCap'],
+        'max_contract': r_json['gameAttributes']['maxContract'] / r_json['gameAttributes']['salaryCap'],
+        'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
+    }
+
     df = player_json_to_df(r_json)
-    df = df[df.season == df[~df.salary.isna()].season.max()].drop_duplicates(['pid', 'season']).reset_index(drop=True)
-    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], 0.75), axis=1)
+    df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
+        drop=True)
+
+    df['tid'] = df['current_tid'].copy()
+    df = df.drop(columns=['current_tid'], axis=1)
+    team_dict = dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']])
+    team_dict[-2] = 'Draft'
+    team_dict[-1] = 'FA'
+    df['team'] = df['tid'].map(team_dict)
+
+    # Calculate Progs
+    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
     df['rating_prog'] = df['results'].apply(lambda x: x['rating'])
     df['rating_upper_prog'] = df['results'].apply(lambda x: x['rating_upper'])
     df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
-    df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
     df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
-    df['team'] = df['tid'].map(dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']]))
-    return df
+
+    # df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
+
+    # Calculate New Potential
+    df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
+
+    # Calculate Salary Projections / Fills
+    df['salary_caps'] = df.apply(lambda x: {i: league_settings['salary_cap'] * (1.0275 ** i) for i in range(10)},
+                                 axis=1)
+    df['cap_hits'] = df.apply(lambda x: {
+        i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
+                                                                                                      dict) and i in x[
+                                                           'salaries'] else None for i in range(10)}, axis=1)
+    df['cap_hits_prog'] = df.apply(predict_cap_hit, axis=1)
+    df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
+
+    # Calculate Surplus
+    df['surplus_1_progs'] = df.apply(lambda x: {
+        i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
+            x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
+        range(10)}, axis=1)
+    df['surplus_2_progs'] = df.apply(lambda x: {
+        i: (x['cap_value_prog'][i] - x['cap_hits_filled'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
+            x['cap_hits_filled'], dict) and i in x['cap_value_prog'] and x['cap_hits_filled'][i] is not None else 0 for
+        i in range(10)}, axis=1)
+
+    # Sum up Values
+    df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
+    df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
+    df['value'] = df[['v1', 'v2']].sum(axis=1)
+
+    # Clean up at the end
+    df['player'] = df['firstName'] + ' ' + df['lastName']
+    df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']
+    df['years'] = df['salaries'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
+
+    return df[~df.team.isna()].reset_index(), league_settings
+
+def select_teams(df):
+    teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA','Draft']
+    num_columns = 7
+    num_per_column = len(teams_to_choose_from) // num_columns + 1
+    columns = st.columns(num_columns)
+    selected_teams = []
+    for i in range(num_columns):
+        for team in teams_to_choose_from[i * num_per_column: (i + 1) * num_per_column]:
+            if team == '*All*':
+                selected = columns[i].checkbox(team, value=True)
+            else:
+                selected = columns[i].checkbox(team)
+            if selected:
+                selected_teams.append(team)
+    return selected_teams
+
+def filter_teams(df, selected_teams):
+    if selected_teams != ['*All*']:
+        return df[df.team.isin(selected_teams)]
+    else:
+        return df
 
 
-def player_plot(pid, df):
-    # Filter the dataframe for the specific pid
-    df_filtered = df[df.pid == pid]
-
-    # Retrieve the player's first name and last name
-    first_name = df_filtered['firstName'].values[0]
-    last_name = df_filtered['lastName'].values[0]
-
-    # Create the title
-    title = f'{first_name} {last_name}'
-
-    # Extract the rating, value, and bounds data
-    rating_data = df_filtered['rating_prog'].values[0]
-    rating_upper_data = df_filtered['rating_upper_prog'].values[0]
-    rating_lower_data = df_filtered['rating_lower_prog'].values[0]
-    value_data = df_filtered['vorp_added_prog'].values[0]
-    cap_value_data = df_filtered['cap_value_prog'].values[0]
-
-    # Create the plot for ratings
-    fig = go.Figure()
-
-    # Add the plot for upper and lower bounds as lines with the area between them filled
-    fig.add_trace(
-        go.Scatter(
-            x=list(rating_upper_data.keys()),
-            y=list(rating_upper_data.values()),
-            name='Upper Bound',
-            mode='lines',
-            line=dict(width=0),
-            hoverinfo='skip',
-            showlegend=False,
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=list(rating_lower_data.keys()),
-            y=list(rating_lower_data.values()),
-            name='Lower Bound',
-            mode='none',
-            fill='tonexty',
-            hoverinfo='skip',
-            fillcolor='rgba(255, 90, 95, 0.2)',
-            showlegend=False,
-        )
-    )
-
-    # Add the plot for ratings as a line
-    fig.add_trace(
-        go.Scatter(
-            x=list(rating_data.keys()),
-            y=list(rating_data.values()),
-            name='Rating',
-            line=dict(
-                color='rgb(255, 90, 95)'
-            ),
-            customdata=np.stack((list(rating_lower_data.values()), list(rating_upper_data.values())), axis=-1),
-            hovertemplate=
-            '<b>Year</b>: %{x}<br>' +
-            '<b>Rating</b>: %{y:.1f}<br>' +  # Round to 1 decimal place
-            '<b>Lower Bound</b>: %{customdata[0]:.1f}<br>' +  # Round to 1 decimal place
-            '<b>Upper Bound</b>: %{customdata[1]:.1f}<br>',  # Round to 1 decimal place
-        )
-    )
-
-    # Add the plot for values as bars
-    fig.add_trace(
-        go.Bar(
-            x=[x - 0.2 for x in list(value_data.keys())],
-            y=list(value_data.values()),
-            name='Value',
-            yaxis='y2',
-            width=0.35,
-            marker=dict(
-                color='rgb(252,100,45)'
-            ),
-            text=[f'{val:.1f}' for val in list(value_data.values())],
-            textposition='outside',
-            textfont=dict(
-                color='rgb(252,100,45)',
-                size=25,
-            ),
-        )
-    )
-
-    # Add the plot for cap values as bars
-    fig.add_trace(
-        go.Bar(
-            x=[x + 0.2 for x in list(cap_value_data.keys())],
-            y=list(cap_value_data.values()),
-            name='Cap Value',
-            yaxis='y3',
-            width=0.35,
-            marker=dict(
-                color='rgb(0, 166, 153)'
-            ),
-            text=[f'{val * 100:.1f}%' for val in list(cap_value_data.values())],
-            textposition='outside',
-            textfont=dict(
-                color='rgb(0, 166, 153)',
-                size=40,
-            ),
-        )
-    )
-
-    # Update the plot title
-    fig.update_layout(
-        template='simple_white',
-        title=title,
-        barmode='group',
-        yaxis=dict(
-            range=[10, 90],
-            showgrid=False,
-            showticklabels=True,
-        ),
-        yaxis2=dict(
-            range=[0, 20],
-            overlaying='y',
-            side='right',
-            showgrid=False,
-            showticklabels=False,
-        ),
-        yaxis3=dict(
-            range=[0, 1],
-            overlaying='y',
-            side='left',
-            showgrid=False,
-            showticklabels=False,
-        )
-    )
-
-    return fig
-
-
-def display_team(team, df):
-    team_df = df[df['team'] == team]
-    team_df = team_df[['player', 'pid', 'season', 'age', 'ovr', 'pot']]
-    return team_df
-
-
-# Check if the file has already been uploaded in the current session
-if 'json_file' not in st.session_state:
-    # If the file has not been uploaded, use the file uploader widget to upload the file
-    json_file = st.file_uploader('Upload a JSON file', type='json')
-    if json_file is not None:
-        # Save the uploaded file in the session state
-        st.session_state.json_file = json_file
-else:
-    # If the file has already been uploaded, use the file from the session state
-    json_file = st.session_state.json_file
-
+json_file = st.file_uploader('Upload a JSON file', type='json')
 if not json_file:
     st.stop()
 
-df = load_and_process_data(json_file)
-df['player'] = df['firstName'] + ' ' + df['lastName']
-team_names = np.sort(df['team'].astype(str).unique())
-my_team = st.selectbox('Select your team:', team_names)
-if my_team:
-    team_df = display_team(my_team, df)
-    st.dataframe(team_df.style \
-                 .background_gradient(cmap='RdBu_r', vmin=0, vmax=100, subset=['ovr', 'pot']) \
-                 .hide(axis='index'), use_container_width=True
-                 )
-player_name = st.text_input('Enter player name:')
-team_name = st.text_input('Enter team name:')
-matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
-    df['team'].str.contains(team_name, na=False, case=False))]
-if not matching_players.empty:
-    selected_index = st.selectbox('Select a player:', matching_players.player)
-    selected_player = matching_players[matching_players.player == selected_index].iloc[0]
-    pid = selected_player['pid']
-    player_fig = player_plot(pid, df)
-    st.plotly_chart(player_fig, use_container_width=True)
-else:
-    st.write('No matching players found.')
+df_import, league_settings = load_and_process_data(json_file)
+df_import['pot'] = df_import['rating_upper']
+
+selected_teams = select_teams(df_import)
+
+
+df_filtered = filter_teams(df_import, selected_teams)
+
+df_display = df_filtered[
+    ['player', 'pid', 'team', 'pos', 'age', 'ovr', 'pot', 'years', 'cap_hit', 'v1', 'v2', 'value']].sort_values('value',
+                                                                                                                ascending=False)
+
+
+def dataframe_with_selections(df):
+    df_with_selections = df.copy()
+    df_with_selections.insert(0, "Select", False)
+
+    # Get dataframe row-selections from user with st.data_editor
+    edited_df = st.data_editor(
+        df_with_selections.style \
+            .format(precision=0, subset=['pid', 'age', 'ovr', 'pot', 'years']) \
+            .format(precision=2, subset=['v1', 'v2', 'value']) \
+            .format("{:.1%}", subset=['cap_hit']) \
+            .background_gradient(cmap='RdBu_r', vmin=26, vmax=80, subset=['ovr', 'pot']) \
+            .background_gradient(cmap='RdBu_r', vmin=-df_import.value.max(), vmax=df_import.value.max(), subset=['v1']) \
+            .background_gradient(cmap='RdBu_r', vmin=-df_import.value.max(), vmax=df_import.value.max(), subset=['v2']) \
+            .background_gradient(cmap='RdBu_r', vmin=-df_import.value.max(), vmax=df_import.value.max(),
+                                 subset=['value']) \
+            .background_gradient(cmap='RdBu_r', vmin=-0.35, vmax=0.35, subset=['cap_hit']) \
+            .background_gradient(cmap='RdBu', vmin=0, vmax=10, subset=['years']) \
+        ,
+        hide_index=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        disabled=df.columns,
+        use_container_width=False
+    )
+
+    # Filter the dataframe using the temporary column, then drop the column
+    selected_rows = edited_df[edited_df.Select]
+    return selected_rows.drop('Select', axis=1)
+
+
+selection = dataframe_with_selections(df_display)
+selected_ids = selection['pid'].values
+
+[st.plotly_chart(player_plot(pid, df_import), use_container_width=True) for pid in selected_ids]
