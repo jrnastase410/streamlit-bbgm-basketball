@@ -1,6 +1,7 @@
 print('Importing libraries...')
 
 import os
+
 print(os.getcwd())
 
 from calcs import *
@@ -13,7 +14,6 @@ st.set_page_config(
     page_title='Home',
     layout='wide'
 )
-
 
 
 @st.cache_data
@@ -171,8 +171,17 @@ def display_team(team, df):
     return team_df
 
 
-# Upload json file
-json_file = st.file_uploader('Upload a JSON file', type='json')
+# Check if the file has already been uploaded in the current session
+if 'json_file' not in st.session_state:
+    # If the file has not been uploaded, use the file uploader widget to upload the file
+    json_file = st.file_uploader('Upload a JSON file', type='json')
+    if json_file is not None:
+        # Save the uploaded file in the session state
+        st.session_state.json_file = json_file
+else:
+    # If the file has already been uploaded, use the file from the session state
+    json_file = st.session_state.json_file
+
 if not json_file:
     st.stop()
 
@@ -182,10 +191,10 @@ team_names = np.sort(df['team'].astype(str).unique())
 my_team = st.selectbox('Select your team:', team_names)
 if my_team:
     team_df = display_team(my_team, df)
-    st.dataframe(team_df.style\
-            .background_gradient(cmap='RdBu_r', vmin=0, vmax=100, subset=['ovr','pot'])\
-        .hide(axis='index'), use_container_width=True
-    )
+    st.dataframe(team_df.style \
+                 .background_gradient(cmap='RdBu_r', vmin=0, vmax=100, subset=['ovr', 'pot']) \
+                 .hide(axis='index'), use_container_width=True
+                 )
 player_name = st.text_input('Enter player name:')
 team_name = st.text_input('Enter team name:')
 matching_players = df[(df['player'].str.contains(player_name, na=False, case=False)) & (
