@@ -85,7 +85,7 @@ def load_and_process_data(json_file, ci_q=0.75):
 
 def select_teams(df):
     teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA', 'Draft']
-    num_columns = 7
+    num_columns = 4
     num_per_column = len(teams_to_choose_from) // num_columns + 1
     columns = st.columns(num_columns)
     selected_teams = []

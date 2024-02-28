@@ -34,35 +34,40 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
 def calc_progs(ovr, age, q=0.9):
     x_prog = progs[progs.age == age]['x'].values
     x_rating = x_prog + ovr
-    x_pred = [ovr_to_vorp(x) for x in x_rating]
-    x_value = np.array(x_pred).clip(0, )
+    x_pred = np.array([ovr_to_vorp(x) for x in x_rating])
+    x_value = np.clip(x_pred, 0, None)
     x_cap_hit = 30 * x_value / 433.58
 
-    rating_dict = dict()
-    rating_uppper_dict = dict()
-    rating_lower_dict = dict()
-    vorp_added_dict = dict()
-    cap_value_dict = dict()
+    rating_dict = {}
+    rating_uppper_dict = {}
+    rating_lower_dict = {}
+    vorp_added_dict = {}
+    cap_value_dict = {}
 
     rating_dict[0] = ovr
     rating_uppper_dict[0] = ovr
     rating_lower_dict[0] = ovr
     vorp_added_dict[0] = ovr_to_vorp(ovr)
-    cap_value_dict[0] = 30 * np.maximum(0,vorp_added_dict[0]) / 433.58
+    cap_value_dict[0] = 30 * np.maximum(0, vorp_added_dict[0]) / 433.58
+
+    progs_age = progs[progs.age == age]
+    y_values = progs_age[[f'y_{i}' for i in range(1, 10)]].values
 
     for i in range(1, 10):
-        y = progs[progs.age == age][f'y_{i}'].values
+        y = y_values[:, i - 1]
         rating_dict[i] = np.dot(x_rating, y) / np.sum(y)
         rating_uppper_dict[i] = compute_kde_percentile_fast(x_rating, y, q)
         rating_lower_dict[i] = compute_kde_percentile_fast(x_rating, y, 1 - q)
         vorp_added_dict[i] = np.dot(x_value, y) / np.sum(y)
         cap_value_dict[i] = np.dot(x_cap_hit, y) / np.sum(y)
 
-    return {'rating': rating_dict,
-            'rating_upper': rating_uppper_dict,
-            'rating_lower': rating_lower_dict,
-            'vorp_added': vorp_added_dict,
-            'cap_value': cap_value_dict}
+    return {
+        'rating': rating_dict,
+        'rating_upper': rating_uppper_dict,
+        'rating_lower': rating_lower_dict,
+        'vorp_added': vorp_added_dict,
+        'cap_value': cap_value_dict
+    }
 
 def predict_cap_hit(row):
     age = row['age']
