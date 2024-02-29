@@ -35,7 +35,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
     }
 
-    print('Converting json to df')
+    app_logger.info('Converting json to df')
 
     df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
     df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
@@ -49,9 +49,9 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['team'] = df['tid'].map(team_dict)
 
     # Calculate Progs
-    print('Calculating Progs')
+    app_logger.info('Calculating Progs')
     df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
-    print('Assigning Progs to Columns')
+    app_logger.info('Assigning Progs to Columns')
     df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(df['results'].tolist(), index=df.index)
 
     # Calculate New Potential
@@ -86,6 +86,8 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['player'] = df['firstName'] + ' ' + df['lastName']
     df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']
     df['years'] = df['salaries'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
+
+    app_logger.info('Finished processing data -> Returning')
 
     return df[~df.team.isna()].reset_index(), league_settings
 
