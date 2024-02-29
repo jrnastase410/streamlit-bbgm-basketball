@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 
-@st.cache_data
+# @st.cache_data
 def load_and_process_data(json_file, ci_q=0.75):
 
     app_logger.info('Loading JSON file')
