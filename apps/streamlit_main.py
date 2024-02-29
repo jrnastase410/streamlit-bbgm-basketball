@@ -15,12 +15,24 @@ from plots import *
 from st_aggrid import *
 import sys
 
-# Redirect stdout to console
-sys.stdout = open(1, 'w', encoding='utf-8', closefd=False)
+# Function to write output to a file
+def write_to_file(text):
+    with open("output.txt", "a") as f:
+        f.write(text + "\n")
 
-# Write text to the console
-print("This is output written to the console.")
-print("Test 2")
+# Function to read output from the file and display it on the console
+def display_output():
+    with open("output.txt", "r") as f:
+        output = f.read()
+    os.remove("output.txt")  # Remove the file after reading its contents
+    print(output)
+
+def print_to_screen(text):
+    write_to_file(text)
+    display_output()
+
+print_to_screen("Hello World")
+print_to_screen("Hello World2")
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
