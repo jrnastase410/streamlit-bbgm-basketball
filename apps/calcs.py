@@ -71,7 +71,6 @@ def calc_progs(ovr, age, q=0.9):
     }
 
 
-@st.cache_data
 def predict_cap_hit(row):
     age = row['age']
     rating_prog = row['rating_prog']
