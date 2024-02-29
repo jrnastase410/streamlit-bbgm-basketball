@@ -14,12 +14,13 @@ progs = pd.read_parquet('./constants/progression.parquet')
 for i in range(1, 10):
     progs[f'y_{i}'] = progs[f'y_{i}'] / (np.sum(progs[f'y_{i}']) / progs.age.nunique())
 
-@st.cache_data
+
 def ovr_to_vorp(ovr):
     if ovr <= UNDER_OVER:
         return np.polyval(poly_under, ovr)
     else:
         return np.polyval(poly_over, ovr)
+
 
 def compute_kde_percentile_fast(x_values, y_values, percentile):
     # Calculate the cumulative sum of the y_values
@@ -31,7 +32,7 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
     # Return the corresponding x_value at this index
     return x_values[index]
 
-@st.cache_data
+
 def calc_progs(ovr, age, q=0.9):
     x_prog = progs[progs.age == age]['x'].values
     x_rating = x_prog + ovr
@@ -68,6 +69,7 @@ def calc_progs(ovr, age, q=0.9):
         'rating_lower': rating_lower_dict,
         'cap_value': cap_value_dict
     }
+
 
 @st.cache_data
 def predict_cap_hit(row):
