@@ -89,20 +89,40 @@ def calc_progs(ovr, age, q=0.9):
     }
 
 
-@st.cache_data
-def predict_single_cap_hit(age, ovr, pot):
-    prediction = cap_hit_model.predict([[age, ovr, pot]])[0]
-    return prediction
+def predict_single_cap_hit(ages, ovrs, pots):
+    # Convert inputs to numpy arrays
+    ages = np.array(ages)
+    ovrs = np.array(ovrs)
+    pots = np.array(pots)
 
+    # Reshape inputs to 2D arrays
+    ages = ages.reshape(-1, 1)
+    ovrs = ovrs.reshape(-1, 1)
+    pots = pots.reshape(-1, 1)
+
+    # Concatenate inputs
+    inputs = np.concatenate([ages, ovrs, pots], axis=1)
+
+    # Predict cap hit for all inputs at once
+    predictions = cap_hit_model.predict(inputs)
+
+    return predictions
 
 def predict_cap_hit(row):
     age = row['age']
     rating_prog = row['rating_prog']
     pot = row['rating_upper']
 
-    cap_hit_proj = {}
-    for year, rating in rating_prog.items():
-        cap_hit_proj[year] = predict_single_cap_hit(age + year, rating, pot)
+    # Prepare inputs for vectorized prediction
+    ages = [age + year for year in rating_prog.keys()]
+    ovrs = list(rating_prog.values())
+    pots = [pot] * len(rating_prog)
+
+    # Call the vectorized prediction function
+    predictions = predict_single_cap_hit(ages, ovrs, pots)
+
+    # Create a dictionary mapping years to predictions
+    cap_hit_proj = dict(zip(rating_prog.keys(), predictions))
 
     return cap_hit_proj
 
