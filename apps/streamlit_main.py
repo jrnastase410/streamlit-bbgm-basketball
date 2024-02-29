@@ -17,7 +17,10 @@ import logging
 from logging import getLogger
 
 app_logger = getLogger()
-app_logger.addHandler(logging.StreamHandler())
+
+if not app_logger.handlers:
+    app_logger.addHandler(logging.StreamHandler())
+
 app_logger.setLevel(logging.INFO)
 app_logger.info('Starting app')
 

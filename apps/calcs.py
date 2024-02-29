@@ -11,9 +11,11 @@ def load_poly_models():
     poly_over = np.load('./models/poly_over.npy')
     return poly_under, poly_over
 
+
 @st.cache_resource
 def load_cap_hit_model():
     return pickle.load(open('models/cap_hit_model.pkl', 'rb'))
+
 
 @st.cache_data
 def load_progs():
@@ -47,7 +49,8 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
     # Return the corresponding x_value at this index
     return x_values[index]
 
-@st.cache_data(show_spinner = False)
+
+@st.cache_data(show_spinner=False)
 def calc_progs(ovr, age, q=0.9):
     x_prog = progs[progs.age == age]['x'].values
     x_rating = x_prog + ovr
@@ -85,11 +88,13 @@ def calc_progs(ovr, age, q=0.9):
         'cap_value': cap_value_dict
     }
 
+
+@st.cache_resource
 def predict_single_cap_hit(age, ovr, pot):
     prediction = cap_hit_model.predict([[age, ovr, pot]])[0]
     return prediction
 
-@st.cache_resource
+
 def predict_cap_hit(row):
     age = row['age']
     rating_prog = row['rating_prog']
