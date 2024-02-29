@@ -13,28 +13,15 @@ from calcs import *
 from data import *
 from plots import *
 from st_aggrid import *
-import logging
-from logging import getLogger
-
-app_logger = getLogger()
-
-if not app_logger.handlers:
-    app_logger.addHandler(logging.StreamHandler())
-
-app_logger.setLevel(logging.INFO)
-app_logger.info('Starting app')
 import sys
 
 # Redirect stdout to console
 sys.stdout = open(1, 'w', encoding='utf-8', closefd=False)
 
-# Write text to the console
-print("This is output written to the console.")
-
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
-    app_logger.info('Loading JSON file')
+    print('Loading JSON file')
 
     r_json = json.load(json_file)
 
@@ -45,7 +32,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
     }
 
-    app_logger.info('Converting json to df')
+    print('Converting json to df')
 
     df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
     df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
@@ -59,32 +46,32 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['team'] = df['tid'].map(team_dict)
 
     # Calculate Progs
-    app_logger.info('Calculating Progs')
+    print('Calculating Progs')
     df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
-    app_logger.info('Assigning Progs to Columns')
+    print('Assigning Progs to Columns')
     df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
         df['results'].tolist(), index=df.index)
 
-    app_logger.info('Calculating Potential / Surplus Value')
+    print('Calculating Potential / Surplus Value')
     # Calculate New Potential
     df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
 
     # Calculate Salary Projections / Fills
-    app_logger.info('Calculating Salary Caps')
+    print('Calculating Salary Caps')
     df['salary_caps'] = df.apply(lambda x: {i: league_settings['salary_cap'] * (1.0275 ** i) for i in range(10)},
                                  axis=1)
-    app_logger.info('Calculating Cap Hits')
+    print('Calculating Cap Hits')
     df['cap_hits'] = df.apply(lambda x: {
         i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
                                                                                                       dict) and i in x[
                                                            'salaries'] else None for i in range(10)}, axis=1)
-    app_logger.info('Predicting Cap Hits')
+    print('Predicting Cap Hits')
     df['cap_hits_prog'] = df.apply(predict_cap_hit, axis=1)
-    app_logger.info('Filling Cap Hits')
+    print('Filling Cap Hits')
     df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
 
     # Calculate Surplus
-    app_logger.info('Calculating surplus progs')
+    print('Calculating surplus progs')
     df['surplus_1_progs'] = df.apply(lambda x: {
         i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
             x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
@@ -95,7 +82,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         i in range(10)}, axis=1)
 
     # Sum up Values
-    app_logger.info('Summing up values')
+    print('Summing up values')
     df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
     df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
     df['value'] = df[['v1', 'v2']].sum(axis=1)
@@ -105,7 +92,7 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']
     df['years'] = df['salaries'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
 
-    app_logger.info('Finished processing data -> Returning')
+    print('Finished processing data -> Returning')
 
     columns_to_keep = ['pid', 'player', 'season', 'ovr', 'pot', 'age', 'pos', 'salary', 'salaries', 'tid', 'team',
                        'rating_prog',
@@ -116,7 +103,7 @@ def load_and_process_data(json_file, ci_q=0.75):
 
     ## Use logger to print memory util of returned dataframe
     return_df = df[~df.team.isna()][columns_to_keep].reset_index()
-    app_logger.info(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
+    print(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
     return return_df, league_settings
 
 
@@ -182,7 +169,7 @@ if not json_file:
 
 df_import, league_settings = load_and_process_data(json_file)
 
-app_logger.info('Data loaded and processed')
+print('Data loaded and processed')
 
 df_import['pot'] = df_import['rating_upper']
 
