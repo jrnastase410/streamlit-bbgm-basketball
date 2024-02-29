@@ -1,4 +1,5 @@
 import streamlit as st
+
 st.set_page_config(
     page_title='Home',
     layout='wide'
@@ -21,7 +22,7 @@ app_logger.setLevel(logging.INFO)
 app_logger.info('Starting app')
 
 
-# @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
+@st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
     app_logger.info('Loading JSON file')
 
@@ -96,7 +97,17 @@ def load_and_process_data(json_file, ci_q=0.75):
 
     app_logger.info('Finished processing data -> Returning')
 
-    return df[~df.team.isna()].reset_index(), league_settings
+    columns_to_keep = ['pid', 'player', 'season', 'ovr', 'pot', 'age', 'pos', 'salary', 'salaries', 'tid', 'team',
+                       'rating_prog',
+                       'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog',
+                       'rating_upper', 'salary_caps', 'cap_hits', 'cap_hits_prog',
+                       'cap_hits_filled', 'surplus_1_progs', 'surplus_2_progs', 'v1', 'v2',
+                       'value', 'cap_hit', 'years']
+
+    ## Use logger to print memory util of returned dataframe
+    return_df = df[~df.team.isna()][columns_to_keep].reset_index()
+    app_logger.info(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
+    return return_df, league_settings
 
 
 def select_teams(df):
