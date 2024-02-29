@@ -65,7 +65,6 @@ def calc_progs(ovr, age, q=0.9):
         'rating': rating_dict,
         'rating_upper': rating_uppper_dict,
         'rating_lower': rating_lower_dict,
-        'vorp_added': vorp_added_dict,
         'cap_value': cap_value_dict
     }
 

@@ -1,5 +1,3 @@
-print('Importing libraries...')
-
 import os
 
 print(os.getcwd())
@@ -18,6 +16,9 @@ st.set_page_config(
 
 @st.cache_data
 def load_and_process_data(json_file, ci_q=0.75):
+
+    print('Loading json file')
+
     r_json = json.load(json_file)
 
     league_settings = {
@@ -27,7 +28,9 @@ def load_and_process_data(json_file, ci_q=0.75):
         'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
     }
 
-    df = player_json_to_df(r_json)
+    print('Converting json to df')
+
+    df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
     df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
         drop=True)
 
@@ -39,13 +42,10 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['team'] = df['tid'].map(team_dict)
 
     # Calculate Progs
+    print('Calculating Progs')
     df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
-    df['rating_prog'] = df['results'].apply(lambda x: x['rating'])
-    df['rating_upper_prog'] = df['results'].apply(lambda x: x['rating_upper'])
-    df['rating_lower_prog'] = df['results'].apply(lambda x: x['rating_lower'])
-    df['cap_value_prog'] = df['results'].apply(lambda x: x['cap_value'])
-
-    # df['vorp_added_prog'] = df['results'].apply(lambda x: x['vorp_added'])
+    print('Assigning Progs to Columns')
+    df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(df['results'].tolist(), index=df.index)
 
     # Calculate New Potential
     df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
