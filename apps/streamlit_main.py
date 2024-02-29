@@ -54,20 +54,26 @@ def load_and_process_data(json_file, ci_q=0.75):
     df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
         df['results'].tolist(), index=df.index)
 
+    app_logger.info('Calculating Potential / Surplus Value')
     # Calculate New Potential
     df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
 
     # Calculate Salary Projections / Fills
+    app_logger.info('Calculating Salary Caps')
     df['salary_caps'] = df.apply(lambda x: {i: league_settings['salary_cap'] * (1.0275 ** i) for i in range(10)},
                                  axis=1)
+    app_logger.info('Calculating Cap Hits')
     df['cap_hits'] = df.apply(lambda x: {
         i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
                                                                                                       dict) and i in x[
                                                            'salaries'] else None for i in range(10)}, axis=1)
+    app_logger.info('Predicting Cap Hits')
     df['cap_hits_prog'] = df.apply(predict_cap_hit, axis=1)
+    app_logger.info('Filling Cap Hits')
     df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
 
     # Calculate Surplus
+    app_logger.info('Calculating surplus progs')
     df['surplus_1_progs'] = df.apply(lambda x: {
         i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
             x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
@@ -78,6 +84,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         i in range(10)}, axis=1)
 
     # Sum up Values
+    app_logger.info('Summing up values')
     df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
     df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
     df['value'] = df[['v1', 'v2']].sum(axis=1)
