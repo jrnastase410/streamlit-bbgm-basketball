@@ -22,13 +22,10 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 def write_to_console(text):
     logging.info(text)
 
-write_to_console('Test1')
-write_to_console('Test2')
-write_to_console('Test3')
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
-    print('Loading JSON file')
+    write_to_console('Loading JSON file')
 
     r_json = json.load(json_file)
 
@@ -39,7 +36,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
     }
 
-    print('Converting json to df')
+    write_to_console('Converting json to df')
 
     df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
     df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
@@ -53,32 +50,32 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['team'] = df['tid'].map(team_dict)
 
     # Calculate Progs
-    print('Calculating Progs')
+    write_to_console('Calculating Progs')
     df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
-    print('Assigning Progs to Columns')
+    write_to_console('Assigning Progs to Columns')
     df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
         df['results'].tolist(), index=df.index)
 
-    print('Calculating Potential / Surplus Value')
+    write_to_console('Calculating Potential / Surplus Value')
     # Calculate New Potential
     df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
 
     # Calculate Salary Projections / Fills
-    print('Calculating Salary Caps')
+    write_to_console('Calculating Salary Caps')
     df['salary_caps'] = df.apply(lambda x: {i: league_settings['salary_cap'] * (1.0275 ** i) for i in range(10)},
                                  axis=1)
-    print('Calculating Cap Hits')
+    write_to_console('Calculating Cap Hits')
     df['cap_hits'] = df.apply(lambda x: {
         i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
                                                                                                       dict) and i in x[
                                                            'salaries'] else None for i in range(10)}, axis=1)
-    print('Predicting Cap Hits')
+    write_to_console('Predicting Cap Hits')
     df['cap_hits_prog'] = df.apply(predict_cap_hit, axis=1)
-    print('Filling Cap Hits')
+    write_to_console('Filling Cap Hits')
     df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
 
     # Calculate Surplus
-    print('Calculating surplus progs')
+    write_to_console('Calculating surplus progs')
     df['surplus_1_progs'] = df.apply(lambda x: {
         i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
             x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
@@ -89,7 +86,7 @@ def load_and_process_data(json_file, ci_q=0.75):
         i in range(10)}, axis=1)
 
     # Sum up Values
-    print('Summing up values')
+    write_to_console('Summing up values')
     df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
     df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
     df['value'] = df[['v1', 'v2']].sum(axis=1)
@@ -99,7 +96,7 @@ def load_and_process_data(json_file, ci_q=0.75):
     df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']
     df['years'] = df['salaries'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
 
-    print('Finished processing data -> Returning')
+    write_to_console('Finished processing data -> Returning')
 
     columns_to_keep = ['pid', 'player', 'season', 'ovr', 'pot', 'age', 'pos', 'salary', 'salaries', 'tid', 'team',
                        'rating_prog',
@@ -110,7 +107,7 @@ def load_and_process_data(json_file, ci_q=0.75):
 
     ## Use logger to print memory util of returned dataframe
     return_df = df[~df.team.isna()][columns_to_keep].reset_index()
-    print(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
+    write_to_console(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
     return return_df, league_settings
 
 
