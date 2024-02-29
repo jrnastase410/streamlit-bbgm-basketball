@@ -1,3 +1,9 @@
+import streamlit as st
+st.set_page_config(
+    page_title='Home',
+    layout='wide'
+)
+
 import os
 
 print(os.getcwd())
@@ -5,7 +11,6 @@ print(os.getcwd())
 from calcs import *
 from data import *
 from plots import *
-import streamlit as st
 from st_aggrid import *
 import logging
 from logging import getLogger
@@ -14,11 +19,6 @@ app_logger = getLogger()
 app_logger.addHandler(logging.StreamHandler())
 app_logger.setLevel(logging.INFO)
 app_logger.info('Starting app')
-
-st.set_page_config(
-    page_title='Home',
-    layout='wide'
-)
 
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
