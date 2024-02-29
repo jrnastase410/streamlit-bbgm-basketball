@@ -13,25 +13,16 @@ from calcs import *
 from data import *
 from plots import *
 from st_aggrid import *
-import sys
+import logging
 
-# Function to write output to a file
-def write_to_file(text):
-    with open("output.txt", "a") as f:
-        f.write(text + "\n")
+# Set up logging to write to the console
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-# Function to read output from the file and display it on the console
-def display_output():
-    with open("output.txt", "r") as f:
-        output = f.read()
-    print(output)
+# Example function that writes to the console
+def write_to_console():
+    logging.info("This is output written to the console.")
 
-def print_to_screen(text):
-    write_to_file(text)
-    display_output()
-
-print_to_screen("Hello World")
-print_to_screen("Hello World2")
+write_to_console()
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
