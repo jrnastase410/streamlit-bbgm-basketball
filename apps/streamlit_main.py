@@ -12,8 +12,8 @@ print(os.getcwd())
 from calcs import *
 from data import *
 from plots import *
-from st_aggrid import *
 import logging
+import json
 
 # Set up logging to write to the console
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -172,12 +172,22 @@ def display_and_select_pids(df):
     selected_pids = list(set(edited_df[edited_df.Select]['pid'].to_list() + st.session_state.selected_pids))
     return selected_pids
 
+if st.button('Clear JSON'):
+    st.session_state['df_import'] = None
 
-json_file = st.file_uploader('Upload a JSON file', type='json')
-if not json_file:
-    st.stop()
+if st.session_state['df_import'] is None:
+    json_file = st.file_uploader('Upload a JSON file', type='json')
+    if not json_file:
+        st.stop()
+    df_import, league_settings = load_and_process_data(json_file)
+    st.session_state['df_import'] = df_import
+    st.session_state['league_settings'] = league_settings
 
-df_import, league_settings = load_and_process_data(json_file)
+df_import = st.session_state['df_import']
+league_settings = st.session_state['league_settings']
+
+## Markdown that shows my season and team
+st.markdown(f"Season: {league_settings['season']}, My Team: {df_import[df_import.tid == league_settings['my_team_id']]['team'].values[0]}")
 
 print('Data loaded and processed')
 
