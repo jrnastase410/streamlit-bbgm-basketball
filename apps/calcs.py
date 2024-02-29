@@ -89,7 +89,7 @@ def calc_progs(ovr, age, q=0.9):
     }
 
 
-@st.cache_resource
+@st.cache_data
 def predict_single_cap_hit(age, ovr, pot):
     prediction = cap_hit_model.predict([[age, ovr, pot]])[0]
     return prediction
@@ -102,8 +102,6 @@ def predict_cap_hit(row):
 
     cap_hit_proj = {}
     for year, rating in rating_prog.items():
-        # The model takes 'age', 'rating', and 'pot' as inputs
-        features = [age + year, rating, pot]
         cap_hit_proj[year] = predict_single_cap_hit(age + year, rating, pot)
 
     return cap_hit_proj
