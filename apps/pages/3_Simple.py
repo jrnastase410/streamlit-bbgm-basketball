@@ -23,14 +23,9 @@ def load_and_process_draft_data(json_file):
     df = player_json_to_df(r_json, keep=['ratings'])
 
     def cleanup_df(df):
-        df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
+        df = df[(df.season == league_settings['season']) & (df.current_tid == -2)].drop_duplicates(['pid', 'season'], keep='last').reset_index(
             drop=True)
-        df['tid'] = df['current_tid'].copy()
-        df = df.drop(columns=['current_tid'], axis=1)
-        team_dict = dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']])
-        team_dict[-2] = 'Draft'
-        team_dict[-1] = 'FA'
-        df['team'] = df['tid'].map(team_dict)
+        df['team'] = 'Draft'
         df['player'] = df['firstName'] + ' ' + df['lastName']
         return df
 
@@ -49,7 +44,6 @@ if st.session_state['df_import'] is None:
 
 # Load data from session state
 df = st.session_state['df_import'].copy()
-df = df[df.team == 'Draft'].reset_index(drop=True)
 league_settings = st.session_state['league_settings']
 
 # Perform calculations
