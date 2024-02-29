@@ -18,6 +18,9 @@ import sys
 # Redirect stdout to console
 sys.stdout = open(1, 'w', encoding='utf-8', closefd=False)
 
+# Write text to the console
+print("This is output written to the console.")
+
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
