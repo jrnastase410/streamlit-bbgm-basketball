@@ -7,6 +7,13 @@ from data import *
 from plots import *
 import streamlit as st
 from st_aggrid import *
+import logging
+from logging import getLogger
+
+app_logger = getLogger()
+app_logger.addHandler(logging.StreamHandler())
+app_logger.setLevel(logging.INFO)
+app_logger.info('Starting app')
 
 st.set_page_config(
     page_title='Home',
@@ -17,7 +24,7 @@ st.set_page_config(
 @st.cache_data
 def load_and_process_data(json_file, ci_q=0.75):
 
-    print('Loading json file')
+    app_logger.info('Loading JSON file')
 
     r_json = json.load(json_file)
 
