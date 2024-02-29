@@ -21,9 +21,8 @@ st.set_page_config(
 )
 
 
-@st.cache_data(ttl=60*60*24*3, max_entries=3, show_spinner=True)
+@st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
-
     app_logger.info('Loading JSON file')
 
     r_json = json.load(json_file)
@@ -52,7 +51,8 @@ def load_and_process_data(json_file, ci_q=0.75):
     app_logger.info('Calculating Progs')
     df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
     app_logger.info('Assigning Progs to Columns')
-    df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(df['results'].tolist(), index=df.index)
+    df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
+        df['results'].tolist(), index=df.index)
 
     # Calculate New Potential
     df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
@@ -115,8 +115,8 @@ def filter_teams(df, selected_teams):
     else:
         return df
 
-def display_and_select_pids(df):
 
+def display_and_select_pids(df):
     if 'selected_pids' not in st.session_state:
         st.session_state.selected_pids = []
 
@@ -146,6 +146,7 @@ def display_and_select_pids(df):
     # Filter the dataframe using the temporary column, then drop the column
     selected_pids = list(set(edited_df[edited_df.Select]['pid'].to_list() + st.session_state.selected_pids))
     return selected_pids
+
 
 json_file = st.file_uploader('Upload a JSON file', type='json')
 if not json_file:
