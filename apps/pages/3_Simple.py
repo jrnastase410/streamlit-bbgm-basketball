@@ -6,7 +6,7 @@ import json
 # Set page configuration with Bootstrap theme
 st.set_page_config(
     page_title='Draft Guide',
-    layout='wide'
+    layout='centered'
 )
 
 from calcs import *
@@ -55,10 +55,14 @@ df['pot'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).astype(int)
 df['cap_value'] = df['cap_value_prog'].apply(lambda x: sum(x.values()))
 df['value'] = df['cap_value'].round(2)
 df['rk'] = df['value'].rank(ascending=False, method='dense').astype(int)
-df = df[['rk', 'player', 'pos', 'age', 'ovr', 'pot', 'value']].sort_values('value', ascending=False)
+
+df['info'] = df['rk'].astype(str) + ' / ' + df['player'] + ' / ' + df['pos'] + ' / ' + df['age'].astype(str)
+df['ratings'] = df['ovr'].astype(str) + ' / ' + df['pot'].astype(str)
+df = df[['info', 'ratings', 'value']].sort_values('value', ascending=False)
 
 # Add a checkbox column for drafted players
 df.insert(0, "Drafted", False)
+
 
 # Get dataframe row-selections from user with st.data_editor
 edited_df = st.data_editor(
