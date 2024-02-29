@@ -21,7 +21,7 @@ app_logger.setLevel(logging.INFO)
 app_logger.info('Starting app')
 
 
-@st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
+# @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
 def load_and_process_data(json_file, ci_q=0.75):
     app_logger.info('Loading JSON file')
 
