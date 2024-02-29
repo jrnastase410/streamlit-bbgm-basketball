@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 
-# @st.cache_data
+@st.cache_data
 def load_and_process_data(json_file, ci_q=0.75):
 
     app_logger.info('Loading JSON file')
@@ -152,6 +152,9 @@ if not json_file:
     st.stop()
 
 df_import, league_settings = load_and_process_data(json_file)
+
+app_logger.info('Data loaded and processed')
+
 df_import['pot'] = df_import['rating_upper']
 
 selected_teams = select_teams(df_import)
