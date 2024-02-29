@@ -1,18 +1,33 @@
 import numpy as np
 import pandas as pd
 import pickle
+
 import streamlit as st
 
-poly_under = np.load('./models/poly_under.npy')
-poly_over = np.load('./models/poly_over.npy')
 
-cap_hit_model = pickle.load(open('models/cap_hit_model.pkl', 'rb'))
+@st.cache_resource
+def load_poly_models():
+    poly_under = np.load('./models/poly_under.npy')
+    poly_over = np.load('./models/poly_over.npy')
+    return poly_under, poly_over
+
+@st.cache_resource
+def load_cap_hit_model():
+    return pickle.load(open('models/cap_hit_model.pkl', 'rb'))
+
+@st.cache_data
+def load_progs():
+    progs = pd.read_parquet('./constants/progression.parquet')
+    for i in range(1, 10):
+        progs[f'y_{i}'] = progs[f'y_{i}'] / (np.sum(progs[f'y_{i}']) / progs.age.nunique())
+    return progs
+
+
+poly_under, poly_over = load_poly_models()
+cap_hit_model = load_cap_hit_model()
+progs = load_progs()
 
 UNDER_OVER = 56.064
-
-progs = pd.read_parquet('./constants/progression.parquet')
-for i in range(1, 10):
-    progs[f'y_{i}'] = progs[f'y_{i}'] / (np.sum(progs[f'y_{i}']) / progs.age.nunique())
 
 
 def ovr_to_vorp(ovr):
@@ -32,7 +47,7 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
     # Return the corresponding x_value at this index
     return x_values[index]
 
-
+@st.cache_data(show_spinner = False)
 def calc_progs(ovr, age, q=0.9):
     x_prog = progs[progs.age == age]['x'].values
     x_rating = x_prog + ovr
