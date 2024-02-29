@@ -70,13 +70,13 @@ def load_and_process_data(json_file, ci_q=0.75):
                                                                                                       dict) and i in x[
                                                            'salaries'] else None for i in range(10)}, axis=1)
     write_to_console('Predicting Cap Hits')
-    df['cap_hits_prog'] = df.apply(predict_cap_hit, axis=1)
+    df['cap_hits_prog'] = df[['age','rating_prog','rating_upper']].apply(predict_cap_hit, axis=1)
     write_to_console('Filling Cap Hits')
     df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
 
     # Calculate Surplus
     write_to_console('Calculating surplus progs')
-    df['surplus_1_progs'] = df[['age','rating_prog','rating_upper']].apply(lambda x: {
+    df['surplus_1_progs'] = df.apply(lambda x: {
         i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
             x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
         range(10)}, axis=1)
