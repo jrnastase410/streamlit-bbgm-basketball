@@ -32,11 +32,23 @@ progs = load_progs()
 UNDER_OVER = 56.064
 
 
-def ovr_to_vorp(ovr):
+def ovr_to_vorp_norm(ovr):
     if ovr <= UNDER_OVER:
         return np.polyval(poly_under, ovr)
     else:
         return np.polyval(poly_over, ovr)
+
+def predict_minutes(ovr):
+    # =6.6208*LN(A2) - 26.515
+    ovr_capped = max(ovr, 1)
+
+    pred_ini = 6.6208 * np.log(ovr_capped) - 26.515
+    pred_inverse = 1 / (1 + np.exp(-pred_ini))
+    pred_final = 3000 * pred_inverse
+    return pred_final
+
+def ovr_to_vorp(ovr):
+    return ovr_to_vorp_norm(ovr) * predict_minutes(ovr) / (82 * 32)
 
 
 def compute_kde_percentile_fast(x_values, y_values, percentile):
@@ -52,11 +64,15 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
 
 @st.cache_data(show_spinner=False)
 def calc_progs(ovr, age, q=0.9):
+
+    sum_vorp = 313.21912442015014
+    num_teams = 30
+
     x_prog = progs[progs.age == age]['x'].values
     x_rating = x_prog + ovr
     x_pred = np.array([ovr_to_vorp(x) for x in x_rating])
     x_value = np.clip(x_pred, 0, None)
-    x_cap_hit = 30 * x_value / 312.77
+    x_cap_hit = num_teams * x_value / sum_vorp
 
     rating_dict = {}
     rating_uppper_dict = {}
@@ -68,7 +84,7 @@ def calc_progs(ovr, age, q=0.9):
     rating_uppper_dict[0] = ovr
     rating_lower_dict[0] = ovr
     vorp_added_dict[0] = ovr_to_vorp(ovr)
-    cap_value_dict[0] = 30 * np.maximum(0, vorp_added_dict[0]) / 312.77
+    cap_value_dict[0] = num_teams * np.maximum(0, vorp_added_dict[0]) / sum_vorp
 
     progs_age = progs[progs.age == age]
     y_values = progs_age[[f'y_{i}' for i in range(1, 10)]].values
@@ -150,3 +166,4 @@ def fill_cap_hits(cap_hits, cap_hits_proj, division_factor):
             null_count = 0  # Reset null count if non-None value is encountered
 
     return filled_cap_hits
+

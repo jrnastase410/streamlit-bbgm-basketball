@@ -39,15 +39,19 @@ def load_and_process_data(json_file, ci_q=0.75):
     write_to_console('Converting json to df')
 
     df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
-    df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
-        drop=True)
 
-    df['tid'] = df['current_tid'].copy()
-    df = df.drop(columns=['current_tid'], axis=1)
-    team_dict = dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']])
-    team_dict[-2] = 'Draft'
-    team_dict[-1] = 'FA'
-    df['team'] = df['tid'].map(team_dict)
+    def cleanup_df(df):
+        df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
+            drop=True)
+        df['tid'] = df['current_tid'].copy()
+        df = df.drop(columns=['current_tid'], axis=1)
+        team_dict = dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']])
+        team_dict[-2] = 'Draft'
+        team_dict[-1] = 'FA'
+        df['team'] = df['tid'].map(team_dict)
+        return df
+
+    df = cleanup_df(df)
 
     # Calculate Progs
     write_to_console('Calculating Progs')
@@ -85,6 +89,10 @@ def load_and_process_data(json_file, ci_q=0.75):
             x['cap_hits_filled'], dict) and i in x['cap_value_prog'] and x['cap_hits_filled'][i] is not None else 0 for
         i in range(10)}, axis=1)
 
+    ## Scale values in progs so that they are equivalent to value * 0.95**i
+    df['surplus_1_progs'] = df['surplus_1_progs'].apply(lambda x: {i: x[i] * (0.95 ** i) for i in x})
+    df['surplus_2_progs'] = df['surplus_2_progs'].apply(lambda x: {i: x[i] * (0.95 ** i) for i in x})
+
     # Sum up Values
     write_to_console('Summing up values')
     df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
@@ -105,15 +113,13 @@ def load_and_process_data(json_file, ci_q=0.75):
                        'cap_hits_filled', 'surplus_1_progs', 'surplus_2_progs', 'v1', 'v2',
                        'value', 'cap_hit', 'years']
 
-    ## Use logger to print memory util of returned dataframe
     return_df = df[~df.team.isna()][columns_to_keep].reset_index()
-    write_to_console(f'Memory Utilization: {return_df.memory_usage(deep=True).sum() / 1024 ** 2:.2f} MB')
     return return_df, league_settings
 
 
 def select_teams(df):
-    teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if len(x) == 3])) + ['FA', 'Draft']
-    num_columns = 7
+    teams_to_choose_from = ['*All*'] + list(np.sort([x for x in df.team.unique() if x not in ['FA','Draft']])) + ['FA', 'Draft']
+    num_columns = 4
     num_per_column = len(teams_to_choose_from) // num_columns + 1
     columns = st.columns(num_columns)
     selected_teams = []
@@ -159,7 +165,7 @@ def display_and_select_pids(df):
         hide_index=True,
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         disabled=df.columns,
-        use_container_width=False
+        use_container_width=True
     )
 
     # Filter the dataframe using the temporary column, then drop the column

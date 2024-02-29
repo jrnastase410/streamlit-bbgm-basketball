@@ -6,11 +6,10 @@ def player_plot(pid, df):
     df_filtered = df[df.pid == pid]
 
     # Retrieve the player's first name and last name
-    first_name = df_filtered['firstName'].values[0]
-    last_name = df_filtered['lastName'].values[0]
+    player = df_filtered['player'].values[0]
 
     # Create the title
-    title = f'{first_name} {last_name}'
+    title = f'{player}'
 
     # Extract the rating, value, and bounds data
     rating_data = df_filtered['rating_prog'].values[0]
