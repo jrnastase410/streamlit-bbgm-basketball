@@ -24,7 +24,6 @@ def write_to_file(text):
 def display_output():
     with open("output.txt", "r") as f:
         output = f.read()
-    os.remove("output.txt")  # Remove the file after reading its contents
     print(output)
 
 def print_to_screen(text):
