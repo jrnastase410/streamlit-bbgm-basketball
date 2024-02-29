@@ -76,7 +76,7 @@ def load_and_process_data(json_file, ci_q=0.75):
 
     # Calculate Surplus
     write_to_console('Calculating surplus progs')
-    df['surplus_1_progs'] = df.apply(lambda x: {
+    df['surplus_1_progs'] = df[['age','rating_prog','rating_upper']].apply(lambda x: {
         i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
             x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
         range(10)}, axis=1)
