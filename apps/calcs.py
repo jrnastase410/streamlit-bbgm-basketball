@@ -38,6 +38,7 @@ def ovr_to_vorp_norm(ovr):
     else:
         return np.polyval(poly_over, ovr)
 
+
 def predict_minutes(ovr):
     # =6.6208*LN(A2) - 26.515
     ovr_capped = max(ovr, 1)
@@ -46,6 +47,7 @@ def predict_minutes(ovr):
     pred_inverse = 1 / (1 + np.exp(-pred_ini))
     pred_final = 3000 * pred_inverse
     return pred_final
+
 
 def ovr_to_vorp(ovr):
     return ovr_to_vorp_norm(ovr) * predict_minutes(ovr) / (82 * 32)
@@ -64,8 +66,11 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
 
 @st.cache_data(show_spinner=False)
 def calc_progs(ovr, age, q=0.9):
+    sum_rvorp = 313.21912442015014
+    sum_wvorp = 41 * 30 / 2.8
 
-    sum_vorp = 313.21912442015014
+    sum_vorp = (sum_rvorp + sum_wvorp) / 2
+
     num_teams = 30
 
     x_prog = progs[progs.age == age]['x'].values
@@ -145,7 +150,7 @@ def predict_cap_hit(row):
     return cap_hit_proj
 
 
-def fill_cap_hits(cap_hits, cap_hits_proj, division_factor):
+def fill_cap_hits(cap_hits, cap_hits_proj, inflation_factor):
     filled_cap_hits = {}
     null_count = 0
     last_non_null_year = None
@@ -157,7 +162,7 @@ def fill_cap_hits(cap_hits, cap_hits_proj, division_factor):
     for i in range(10):
         if cap_hits[i] is None:
             if last_non_null_year is not None:
-                filled_cap_hits[i] = cap_hits_proj.get(last_non_null_year, 0) / (division_factor ** null_count)
+                filled_cap_hits[i] = cap_hits_proj.get(last_non_null_year, 0) / (inflation_factor ** null_count)
             else:
                 filled_cap_hits[i] = 0  # or some default value if no non-null year found
             null_count += 1
@@ -167,3 +172,60 @@ def fill_cap_hits(cap_hits, cap_hits_proj, division_factor):
 
     return filled_cap_hits
 
+
+def calculate_progs(df, ci_q):
+    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
+    df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
+        df['results'].tolist(), index=df.index)
+    return df
+
+
+def calculate_potential(df):
+    df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
+    df['pot'] = df['rating_upper'].values
+    return df
+
+
+def calculate_salary_projections(df, league_settings, inflation_factor):
+    df['salary_caps'] = df.apply(
+        lambda x: {i: league_settings['salary_cap'] * (inflation_factor ** i) for i in range(10)},
+        axis=1)
+    return df
+
+
+def calculate_cap_hits(df):
+    df['cap_hits'] = df.apply(lambda x: {
+        i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
+                                                                                                      dict) and i in x[
+                                                           'salaries'] else None for i in range(10)}, axis=1)
+    return df
+
+
+def predict_cap_hits(df):
+    df['cap_hits_prog'] = df[['age', 'rating_prog', 'rating_upper']].apply(predict_cap_hit, axis=1)
+    return df
+
+
+def calculate_surplus(df):
+    df['surplus_1_progs'] = df.apply(lambda x: {
+        i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
+            x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
+        range(10)}, axis=1)
+    df['surplus_2_progs'] = df.apply(lambda x: {
+        i: (x['cap_value_prog'][i] - x['cap_hits_filled'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
+            x['cap_hits_filled'], dict) and i in x['cap_value_prog'] and x['cap_hits_filled'][i] is not None else 0 for
+        i in range(10)}, axis=1)
+    return df
+
+
+def scale_surplus(df, scale_factor):
+    df['surplus_1_progs'] = df['surplus_1_progs'].apply(lambda x: {i: x[i] * (scale_factor ** i) for i in x})
+    df['surplus_2_progs'] = df['surplus_2_progs'].apply(lambda x: {i: x[i] * (scale_factor ** i) for i in x})
+    return df
+
+
+def sum_values(df):
+    df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
+    df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
+    df['value'] = df[['v1', 'v2']].sum(axis=1)
+    return df

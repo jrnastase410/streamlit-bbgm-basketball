@@ -24,87 +24,22 @@ def write_to_console(text):
 
 
 @st.cache_data(ttl=60 * 60 * 24 * 3, max_entries=3, show_spinner=True)
-def load_and_process_data(json_file, ci_q=0.75):
-    write_to_console('Loading JSON file')
-
-    r_json = json.load(json_file)
-
-    league_settings = {
-        'season': r_json['gameAttributes']['season'],
-        'salary_cap': r_json['gameAttributes']['salaryCap'],
-        'max_contract': r_json['gameAttributes']['maxContract'] / r_json['gameAttributes']['salaryCap'],
-        'my_team_id': r_json['gameAttributes']['userTid'][-1]['value']
-    }
-
-    write_to_console('Converting json to df')
-
-    df = player_json_to_df(r_json, keep=['ratings', 'salaries'])
-
-    def cleanup_df(df):
-        df = df[df.season == league_settings['season']].drop_duplicates(['pid', 'season'], keep='last').reset_index(
-            drop=True)
-        df['tid'] = df['current_tid'].copy()
-        df = df.drop(columns=['current_tid'], axis=1)
-        team_dict = dict([(teams['tid'], teams['abbrev']) for teams in r_json['teams']])
-        team_dict[-2] = 'Draft'
-        team_dict[-1] = 'FA'
-        df['team'] = df['tid'].map(team_dict)
-        return df
-
-    df = cleanup_df(df)
-
-    # Calculate Progs
-    write_to_console('Calculating Progs')
-    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
-    write_to_console('Assigning Progs to Columns')
-    df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
-        df['results'].tolist(), index=df.index)
-
-    write_to_console('Calculating Potential / Surplus Value')
-    # Calculate New Potential
-    df['rating_upper'] = df['rating_upper_prog'].apply(lambda x: max(x.values())).round(0).astype('int64[pyarrow]')
-
-    # Calculate Salary Projections / Fills
-    write_to_console('Calculating Salary Caps')
-    df['salary_caps'] = df.apply(lambda x: {i: league_settings['salary_cap'] * (1.0275 ** i) for i in range(10)},
-                                 axis=1)
-    write_to_console('Calculating Cap Hits')
-    df['cap_hits'] = df.apply(lambda x: {
-        i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
-                                                                                                      dict) and i in x[
-                                                           'salaries'] else None for i in range(10)}, axis=1)
-    write_to_console('Predicting Cap Hits')
-    df['cap_hits_prog'] = df[['age','rating_prog','rating_upper']].apply(predict_cap_hit, axis=1)
-    write_to_console('Filling Cap Hits')
-    df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], 1.0275), axis=1)
-
-    # Calculate Surplus
-    write_to_console('Calculating surplus progs')
-    df['surplus_1_progs'] = df.apply(lambda x: {
-        i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
-            x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
-        range(10)}, axis=1)
-    df['surplus_2_progs'] = df.apply(lambda x: {
-        i: (x['cap_value_prog'][i] - x['cap_hits_filled'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
-            x['cap_hits_filled'], dict) and i in x['cap_value_prog'] and x['cap_hits_filled'][i] is not None else 0 for
-        i in range(10)}, axis=1)
-
-    ## Scale values in progs so that they are equivalent to value * 0.95**i
-    df['surplus_1_progs'] = df['surplus_1_progs'].apply(lambda x: {i: x[i] * (0.95 ** i) for i in x})
-    df['surplus_2_progs'] = df['surplus_2_progs'].apply(lambda x: {i: x[i] * (0.95 ** i) for i in x})
-
-    # Sum up Values
-    write_to_console('Summing up values')
-    df['v1'] = df['surplus_1_progs'].apply(lambda x: sum(x.values()))
-    df['v2'] = (df['surplus_2_progs'].apply(lambda x: sum(x.values())) - df['v1']).clip(0, )
-    df['value'] = df[['v1', 'v2']].sum(axis=1)
-
-    # Clean up at the end
-    df['player'] = df['firstName'] + ' ' + df['lastName']
-    df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']
-    df['years'] = df['salaries'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
-
-    write_to_console('Finished processing data -> Returning')
+def load_and_process_data(json_file, keep=['ratings', 'salaries'], ci_q=0.75, inflation_factor=1.0275,
+                          scale_factor=0.9):
+    r_json = load_json(json_file)
+    league_settings = get_league_settings(r_json)
+    df = player_json_to_df(r_json, keep=keep)
+    df = cleanup_df(df, league_settings, r_json)
+    df = calculate_progs(df, ci_q)
+    df = calculate_potential(df)
+    df = calculate_salary_projections(df, league_settings, inflation_factor)
+    df = calculate_cap_hits(df)
+    df = predict_cap_hits(df)
+    df['cap_hits_filled'] = df.apply(lambda row: fill_cap_hits(row['cap_hits'], row['cap_hits_prog'], inflation_factor),
+                                     axis=1)
+    df = calculate_surplus(df)
+    df = scale_surplus(df, scale_factor)
+    df = sum_values(df)
 
     columns_to_keep = ['pid', 'player', 'season', 'ovr', 'pot', 'age', 'pos', 'salary', 'salaries', 'tid', 'team',
                        'rating_prog',
@@ -136,9 +71,9 @@ def select_teams(df):
 
 def filter_teams(df, selected_teams):
     if selected_teams != ['*All*']:
-        return df[df.team.isin(selected_teams)]
+        return df[(df.team.isin(selected_teams))]
     else:
-        return df
+        return df[~df.team.isin(['Draft'])]
 
 
 def display_and_select_pids(df):
@@ -173,17 +108,34 @@ def display_and_select_pids(df):
     return selected_pids
 
 if st.button('Clear JSON'):
-    st.session_state['df_import'] = None
+    try:
+        del st.session_state['json_file']
+    except:
+        pass
 
-if st.session_state['df_import'] is None:
+if 'json_file' in st.session_state:
+    json_file = st.session_state['json_file']
+else:
     json_file = st.file_uploader('Upload a JSON file', type='json')
-    if not json_file:
-        st.stop()
-    df_import, league_settings = load_and_process_data(json_file)
-    st.session_state['df_import'] = df_import
-    st.session_state['league_settings'] = league_settings
 
-df_import = st.session_state['df_import']
+if not json_file:
+    st.stop()
+
+df_all, league_settings = load_and_process_data(json_file)
+
+st.write(df_all.head())
+
+st.session_state['json_file'] = json_file
+
+st.write(st.session_state['json_file'] if 'json_file' in st.session_state else 'No file uploaded')
+
+st.write('--------------------------------')
+st.write('--------------------------------')
+st.write('--------------------------------')
+st.write('--------------------------------')
+
+
+"""df_import = st.session_state['df_import']
 league_settings = st.session_state['league_settings']
 
 ## Markdown that shows my season and team
@@ -216,3 +168,4 @@ if len(st.session_state['selected_pids']) > 0:
     st.dataframe(pivot_table)
 
 [st.plotly_chart(player_plot(pid, df_import), use_container_width=True) for pid in st.session_state['selected_pids']]
+"""
