@@ -11,8 +11,6 @@ from data import *
 from utils import *
 from plots import *
 
-import numpy as np
-
 if 'resign_df' not in st.session_state:
     league_settings = get_league_settings(st.session_state['r_json'])
     my_team = league_settings['my_team_id']

@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 if st.button('Clear JSON'):
-    for key_to_drop in ['r_json', 'draft_df', 'my_team_df']:
+    for key_to_drop in ['r_json', 'draft_df', 'my_team_df', 'resign_df', 'all_df']:
         try:
             del st.session_state[key_to_drop]
         except:
