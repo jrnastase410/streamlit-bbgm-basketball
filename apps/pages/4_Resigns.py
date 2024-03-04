@@ -13,12 +13,16 @@ from plots import *
 
 import numpy as np
 
-league_settings = get_league_settings(st.session_state['r_json'])
-my_team = league_settings['my_team_id']
-df = load_and_process_data(
+if 'resign_df' not in st.session_state:
+    league_settings = get_league_settings(st.session_state['r_json'])
+    my_team = league_settings['my_team_id']
+    st.session_state['resign_df'] = load_and_process_data(
     r_json=st.session_state['r_json'],
     filter_column='tid',
     filter_values=[-1, my_team])[0]
+
+df = st.session_state['resign_df'].copy()
+league_settings = get_league_settings(st.session_state['r_json'])
 
 df['info'] = df['player'] + ' (' + df['team'] + ')' + ' - ' + df['pid'].astype(str)
 info_dict = df.set_index('pid')['info'].to_dict()

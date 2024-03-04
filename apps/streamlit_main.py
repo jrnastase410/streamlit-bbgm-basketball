@@ -4,7 +4,9 @@ from data import load_json
 # Set page configuration with Bootstrap theme
 st.set_page_config(
     page_title='Home / Upload',
-    layout='centered'
+    layout='centered',
+    ## good upload icon
+    page_icon=':open_file_folder:'
 )
 
 if st.button('Clear JSON'):
