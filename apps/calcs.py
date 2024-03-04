@@ -66,10 +66,10 @@ def compute_kde_percentile_fast(x_values, y_values, percentile):
 
 @st.cache_data(show_spinner=False)
 def calc_progs(ovr, age, q=0.9):
-    sum_rvorp = 313.21912442015014
+    sum_rvorp = 309.00924055899424
     sum_wvorp = 41 * 30 / 2.8
 
-    sum_vorp = (sum_rvorp + sum_wvorp) / 2
+    sum_vorp = (sum_rvorp + sum_rvorp) / 2
 
     num_teams = 30
 
@@ -80,13 +80,13 @@ def calc_progs(ovr, age, q=0.9):
     x_cap_hit = num_teams * x_value / sum_vorp
 
     rating_dict = {}
-    rating_uppper_dict = {}
+    rating_upper_dict = {}
     rating_lower_dict = {}
     vorp_added_dict = {}
     cap_value_dict = {}
 
     rating_dict[0] = ovr
-    rating_uppper_dict[0] = ovr
+    rating_upper_dict[0] = ovr
     rating_lower_dict[0] = ovr
     vorp_added_dict[0] = ovr_to_vorp(ovr)
     cap_value_dict[0] = num_teams * np.maximum(0, vorp_added_dict[0]) / sum_vorp
@@ -97,14 +97,14 @@ def calc_progs(ovr, age, q=0.9):
     for i in range(1, 10):
         y = y_values[:, i - 1]
         rating_dict[i] = np.dot(x_rating, y) / np.sum(y)
-        rating_uppper_dict[i] = compute_kde_percentile_fast(x_rating, y, q)
+        rating_upper_dict[i] = compute_kde_percentile_fast(x_rating, y, q)
         rating_lower_dict[i] = compute_kde_percentile_fast(x_rating, y, 1 - q)
         vorp_added_dict[i] = np.dot(x_value, y) / np.sum(y)
         cap_value_dict[i] = np.dot(x_cap_hit, y) / np.sum(y)
 
     return {
         'rating': rating_dict,
-        'rating_upper': rating_uppper_dict,
+        'rating_upper': rating_upper_dict,
         'rating_lower': rating_lower_dict,
         'cap_value': cap_value_dict
     }
@@ -186,9 +186,9 @@ def calculate_potential(df):
     return df
 
 
-def calculate_salary_projections(df, league_settings, inflation_factor):
+def calculate_salary_projections(df, league_settings, inflation_factor, salary_cap_scale=1.0):
     df['salary_caps'] = df.apply(
-        lambda x: {i: league_settings['salary_cap'] * (inflation_factor ** i) for i in range(10)},
+        lambda x: {i: salary_cap_scale * league_settings['salary_cap'] * (inflation_factor ** i) for i in range(10)},
         axis=1)
     return df
 

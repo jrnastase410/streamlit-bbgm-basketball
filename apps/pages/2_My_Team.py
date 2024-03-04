@@ -2,7 +2,7 @@ import streamlit as st
 
 # Set page configuration with Bootstrap theme
 st.set_page_config(
-    page_title='Draft Guide',
+    page_title='My Team',
     layout='centered'
 )
 
@@ -12,8 +12,11 @@ from utils import *
 from plots import *
 
 if 'my_team_df' not in st.session_state:
-    st.session_state['my_team_df'] = \
-        load_and_process_data(st.session_state['r_json'], filter_column='team', filter_values=['SAS'])[0]
+    my_team = get_league_settings(st.session_state['r_json'])['my_team_id']
+    st.session_state['my_team_df'] = load_and_process_data(
+        r_json=st.session_state['r_json'],
+        filter_column='tid',
+        filter_values=[my_team])[0]
 
 df = st.session_state['my_team_df'].copy()
 
@@ -32,7 +35,7 @@ st.markdown("""# My Team""", unsafe_allow_html=True)
 st.markdown("""------------------------------""")
 st.markdown("""### Roster""", unsafe_allow_html=True)
 edited_df = st.data_editor(
-    df[['Drafted', 'pid', 'info', 'ratings', 'value']].sort_values('value', ascending=False).style \
+    df[['Drafted', 'info', 'ratings', 'value', 'pid']].sort_values('value', ascending=False).style \
         .background_gradient(cmap='RdBu_r', vmin=-5, vmax=5, subset=['value']) \
         .format(precision=2, subset=['value']),
     hide_index=True,

@@ -1,19 +1,34 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import os
-os.getcwd()
 
+# Set page configuration with Bootstrap theme
 st.set_page_config(
-    page_title='Signing',
-    layout='wide'
+    page_title='Show All',
+    layout='centered'
 )
 
-df = st.session_state['df_import']
-league_settings = st.session_state['league_settings']
+from calcs import *
+from data import *
+from utils import *
+from plots import *
+
+import numpy as np
+
+league_settings = get_league_settings(st.session_state['r_json'])
+my_team = league_settings['my_team_id']
+df = load_and_process_data(
+    r_json=st.session_state['r_json'],
+    filter_column='tid',
+    filter_values=[-1, my_team])[0]
+
+df['info'] = df['player'] + ' (' + df['team'] + ')' + ' - ' + df['pid'].astype(str)
+info_dict = df.set_index('pid')['info'].to_dict()
+rev_info_dict = {v: k for k, v in info_dict.items()}
 
 # Get player_id from the user
-player_id = st.selectbox('Select a player', options=df['pid'].unique())
+selection = st.selectbox('Select a player', options=df.sort_values(['tid','player'],ascending=[False,True])['info'].unique())
+st.write(f'You selected: {selection}')
+player_id = rev_info_dict[selection]
+st.write(f'Player ID: {player_id}')
 
 num_options = 5
 
