@@ -57,7 +57,7 @@ def load_and_process_data(
     scale_factor=0.9,
     filter_column=None,
     filter_values=None,
-    use_model_ovr=False,
+    use_model_ovr=True,
 ):
     league_settings = get_league_settings(r_json)
     df = player_json_to_df(r_json, keep=keep)
