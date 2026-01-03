@@ -5,7 +5,7 @@ from data import *
 from calcs import *
 
 
-def apply_model_predictions(df, models_dir="../models/ovr"):
+def apply_model_predictions(df, models_dir="models/ovr"):
     """Load models and apply predictions to calculate new_ovr"""
     models_dir = Path(models_dir)
 
