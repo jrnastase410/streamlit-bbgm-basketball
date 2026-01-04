@@ -55,11 +55,11 @@ def load_and_process_data(
     r_json,
     keep=["ratings", "salaries"],
     ci_q=0.75,
-    inflation_factor=1.0275,
+    inflation_factor=1.0,
     scale_factor=0.9,
     filter_column=None,
     filter_values=None,
-    use_model_ovr=True,
+    use_model_ovr=False,
 ):
     league_settings = get_league_settings(r_json)
     df = player_json_to_df(r_json, keep=keep)
