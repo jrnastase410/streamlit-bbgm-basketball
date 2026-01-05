@@ -1,15 +1,11 @@
 import pickle
 from pathlib import Path
 import xgboost as xgb
-import streamlit as st
-from data import get_league_settings, player_json_to_df, cleanup_df, filter_df
-from calcs import (calculate_progs, calculate_potential, calculate_salary_projections,
-                   calculate_cap_hits, predict_cap_hits, fill_cap_hits,
-                   calculate_surplus, scale_surplus, sum_values)
+from data import *
+from calcs import *
 
 
-@st.cache_data(show_spinner=False)
-def apply_model_predictions(df, models_dir="../models/ovr"):
+def apply_model_predictions(df, models_dir="models/ovr"):
     """Load models and apply predictions to calculate new_ovr"""
     models_dir = Path(models_dir)
 
@@ -60,7 +56,7 @@ def load_and_process_data(
     r_json,
     keep=["ratings", "salaries"],
     ci_q=0.75,
-    inflation_factor=1.0275,
+    inflation_factor=1.0,
     scale_factor=0.9,
     filter_column=None,
     filter_values=None,
