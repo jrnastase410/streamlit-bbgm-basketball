@@ -1,8 +1,14 @@
 import pickle
 from pathlib import Path
 import xgboost as xgb
+import streamlit as st
+from data import get_league_settings, player_json_to_df, cleanup_df, filter_df
+from calcs import (calculate_progs, calculate_potential, calculate_salary_projections,
+                   calculate_cap_hits, predict_cap_hits, fill_cap_hits,
+                   calculate_surplus, scale_surplus, sum_values)
 
 
+@st.cache_data(show_spinner=False)
 def apply_model_predictions(df, models_dir="../models/ovr"):
     """Load models and apply predictions to calculate new_ovr"""
     models_dir = Path(models_dir)
@@ -49,6 +55,7 @@ def apply_model_predictions(df, models_dir="../models/ovr"):
     return df
 
 
+@st.cache_data(show_spinner="Processing league data...")
 def load_and_process_data(
     r_json,
     keep=["ratings", "salaries"],
@@ -73,12 +80,11 @@ def load_and_process_data(
     df = calculate_salary_projections(df, league_settings, inflation_factor)
     df = calculate_cap_hits(df)
     df = predict_cap_hits(df)
-    df["cap_hits_filled"] = df.apply(
-        lambda row: fill_cap_hits(
-            row["cap_hits"], row["cap_hits_prog"], inflation_factor
-        ),
-        axis=1,
-    )
+    # Vectorized fill_cap_hits
+    df["cap_hits_filled"] = [
+        fill_cap_hits(cap_hits, cap_hits_prog, inflation_factor)
+        for cap_hits, cap_hits_prog in zip(df["cap_hits"], df["cap_hits_prog"])
+    ]
     df = calculate_surplus(df)
     df = scale_surplus(df, scale_factor)
     df = sum_values(df)

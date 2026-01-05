@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
 import numpy as np
+import streamlit as st
 
+@st.cache_data(show_spinner=False)
 def player_plot(pid, df):
     # Filter the dataframe for the specific pid
     df_filtered = df[df.pid == pid]

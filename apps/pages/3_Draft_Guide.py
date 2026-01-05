@@ -11,18 +11,19 @@ from data import *
 from utils import *
 from plots import *
 
-if 'draft_df' not in st.session_state:
-    st.session_state['draft_df'] = \
-    load_and_process_data(st.session_state['r_json'], filter_column='team', filter_values=['Draft'])[0]
+# Use centralized data from session state
+if 'full_df' not in st.session_state:
+    st.error('Please upload a JSON file first')
+    st.stop()
 
-df = st.session_state['draft_df'].copy()
+df = st.session_state['full_df'][st.session_state['full_df']['team'] == 'Draft']
 
 # Perform calculations
 
 df['cap_value'] = df['cap_value_prog'].apply(lambda x: sum(x.values())) / 9
 df['value'] = df['cap_value'].round(2)
 df['rk'] = df['value'].rank(ascending=False, method='dense').astype(int)
-df['info'] = df['rk'].astype(str) + ' / ' + df['player'] + ' / ' + df['pos'] + ' / ' + df['age'].astype(str)
+df['info'] = df['rk'].astype(str) + ' / ' + df['player'] + ' / ' + df['pos'].astype(str) + ' / ' + df['age'].astype(str)
 df['ratings'] = df['ovr'].astype(str) + ' / ' + df['pot'].astype(str)
 
 # Add a checkbox column for drafted players

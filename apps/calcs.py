@@ -174,9 +174,10 @@ def fill_cap_hits(cap_hits, cap_hits_proj, inflation_factor):
 
 
 def calculate_progs(df, ci_q):
-    df['results'] = df.apply(lambda x: calc_progs(x['ovr'], x['age'], ci_q), axis=1)
+    # Vectorized calculation of progressions
+    results = [calc_progs(ovr, age, ci_q) for ovr, age in zip(df['ovr'], df['age'])]
     df[['rating_prog', 'rating_upper_prog', 'rating_lower_prog', 'cap_value_prog']] = pd.DataFrame(
-        df['results'].tolist(), index=df.index)
+        results, index=df.index)
     return df
 
 
@@ -187,40 +188,65 @@ def calculate_potential(df):
 
 
 def calculate_salary_projections(df, league_settings, inflation_factor, salary_cap_scale=1.0):
-    df['salary_caps'] = df.apply(
-        lambda x: {i: salary_cap_scale * league_settings['salary_cap'] * (inflation_factor ** i) for i in range(10)},
-        axis=1)
+    # Vectorized calculation of salary caps
+    salary_cap_base = salary_cap_scale * league_settings['salary_cap']
+    df['salary_caps'] = [
+        {i: salary_cap_base * (inflation_factor ** i) for i in range(10)}
+        for _ in range(len(df))
+    ]
     return df
 
 
 def calculate_cap_hits(df):
-    df['cap_hits'] = df.apply(lambda x: {
-        i: (x['salaries'][i] / x['salary_caps'][i]) if isinstance(x['salaries'], dict) and isinstance(x['salary_caps'],
-                                                                                                      dict) and i in x[
-                                                           'salaries'] else None for i in range(10)}, axis=1)
+    # Vectorized calculation of cap hits
+    cap_hits_list = []
+    for salaries, salary_caps in zip(df['salaries'], df['salary_caps']):
+        cap_hit = {
+            i: (salaries[i] / salary_caps[i]) if isinstance(salaries, dict) and isinstance(salary_caps, dict) and i in salaries else None 
+            for i in range(10)
+        }
+        cap_hits_list.append(cap_hit)
+    df['cap_hits'] = cap_hits_list
     return df
 
 
 def predict_cap_hits(df):
-    df['cap_hits_prog'] = df[['age', 'rating_prog', 'rating_upper']].apply(predict_cap_hit, axis=1)
+    # Vectorized prediction of cap hits
+    cap_hits_prog_list = []
+    for _, row in df[['age', 'rating_prog', 'rating_upper']].iterrows():
+        cap_hits_prog_list.append(predict_cap_hit(row))
+    df['cap_hits_prog'] = cap_hits_prog_list
     return df
 
 
 def calculate_surplus(df):
-    df['surplus_1_progs'] = df.apply(lambda x: {
-        i: (x['cap_value_prog'][i] - x['cap_hits'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
-            x['cap_hits'], dict) and i in x['cap_value_prog'] and x['cap_hits'][i] is not None else 0 for i in
-        range(10)}, axis=1)
-    df['surplus_2_progs'] = df.apply(lambda x: {
-        i: (x['cap_value_prog'][i] - x['cap_hits_filled'][i]) if isinstance(x['cap_value_prog'], dict) and isinstance(
-            x['cap_hits_filled'], dict) and i in x['cap_value_prog'] and x['cap_hits_filled'][i] is not None else 0 for
-        i in range(10)}, axis=1)
+    # Vectorized calculation of surplus
+    surplus_1_list = []
+    surplus_2_list = []
+    
+    for cap_value_prog, cap_hits, cap_hits_filled in zip(df['cap_value_prog'], df['cap_hits'], df['cap_hits_filled']):
+        surplus_1 = {
+            i: (cap_value_prog[i] - cap_hits[i]) if isinstance(cap_value_prog, dict) and isinstance(cap_hits, dict) 
+                and i in cap_value_prog and cap_hits[i] is not None else 0 
+            for i in range(10)
+        }
+        surplus_2 = {
+            i: (cap_value_prog[i] - cap_hits_filled[i]) if isinstance(cap_value_prog, dict) and isinstance(cap_hits_filled, dict) 
+                and i in cap_value_prog and cap_hits_filled[i] is not None else 0 
+            for i in range(10)
+        }
+        surplus_1_list.append(surplus_1)
+        surplus_2_list.append(surplus_2)
+    
+    df['surplus_1_progs'] = surplus_1_list
+    df['surplus_2_progs'] = surplus_2_list
     return df
 
 
 def scale_surplus(df, scale_factor):
-    df['surplus_1_progs'] = df['surplus_1_progs'].apply(lambda x: {i: x[i] * (scale_factor ** i) for i in x})
-    df['surplus_2_progs'] = df['surplus_2_progs'].apply(lambda x: {i: x[i] * (scale_factor ** i) for i in x})
+    # Vectorized scaling of surplus
+    df['surplus_1_progs'] = [{i: x[i] * (scale_factor ** i) for i in x} for x in df['surplus_1_progs']]
+    df['surplus_2_progs'] = [{i: x[i] * (scale_factor ** i) for i in x} for x in df['surplus_2_progs']]
     return df
 
 

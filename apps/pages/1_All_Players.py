@@ -13,12 +13,13 @@ from plots import *
 
 import numpy as np
 
-if 'all_df' not in st.session_state:
-    st.session_state['all_df'] = load_and_process_data(
-        r_json=st.session_state['r_json'])[0]
+# Use centralized data from session state
+if 'full_df' not in st.session_state:
+    st.error('Please upload a JSON file first')
+    st.stop()
 
-df = st.session_state['all_df'].copy()
-league_settings = get_league_settings(st.session_state['r_json'])
+df = st.session_state['full_df']
+league_settings = st.session_state['league_settings']
 
 
 def select_teams(df):

@@ -11,18 +11,16 @@ from data import *
 from utils import *
 from plots import *
 
-if 'resign_df' not in st.session_state:
-    league_settings = get_league_settings(st.session_state['r_json'])
-    my_team = league_settings['my_team_id']
-    st.session_state['resign_df'] = load_and_process_data(
-    r_json=st.session_state['r_json'],
-    filter_column='tid',
-    filter_values=[-1, my_team])[0]
+# Use centralized data from session state
+if 'full_df' not in st.session_state:
+    st.error('Please upload a JSON file first')
+    st.stop()
 
-df = st.session_state['resign_df'].copy()
-league_settings = get_league_settings(st.session_state['r_json'])
+my_team_id = st.session_state['league_settings']['my_team_id']
+df = st.session_state['full_df'][(st.session_state['full_df']['tid'] == -1) | (st.session_state['full_df']['tid'] == my_team_id)]
+league_settings = st.session_state['league_settings']
 
-df['info'] = df['player'] + ' (' + df['team'] + ')' + ' - ' + df['pid'].astype(str)
+df['info'] = df['player'] + ' (' + df['team'].astype(str) + ')' + ' - ' + df['pid'].astype(str)
 info_dict = df.set_index('pid')['info'].to_dict()
 rev_info_dict = {v: k for k, v in info_dict.items()}
 
