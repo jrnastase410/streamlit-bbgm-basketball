@@ -8,6 +8,7 @@ def load_json(json_file):
     return r_json
 
 
+@st.cache_data(show_spinner=False)
 def get_league_settings(r_json):
     league_settings = {
         'season': r_json['gameAttributes']['season'],
@@ -57,8 +58,11 @@ def player_json_to_df(r_json, keep=['ratings', 'salaries', 'stats']):
                 future_years[i] = future_row['salary']
             return future_years
 
-        # Apply the function to each row
-        salaries_df['salaries'] = salaries_df.apply(lambda row: calculate_future_salaries(row), axis=1)
+        # Vectorized apply using list comprehension for better performance
+        salaries_df['salaries'] = [
+            calculate_future_salaries(row)
+            for _, row in salaries_df.iterrows()
+        ]
 
     if 'stats' in keep and 'salaries' in keep:
         df = ratings_df.merge(
@@ -94,6 +98,9 @@ def cleanup_df(df, league_settings, r_json):
     team_dict[-2] = 'Draft'
     team_dict[-1] = 'FA'
     df['team'] = df['tid'].map(team_dict)
+    # Convert to categorical for better performance
+    df['team'] = df['team'].astype('category')
+    df['pos'] = df['pos'].astype('category')
 
     df['player'] = df['firstName'] + ' ' + df['lastName']
     df['cap_hit'] = df['salary'].fillna(0) / league_settings['salary_cap']

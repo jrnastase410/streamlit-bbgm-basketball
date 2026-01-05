@@ -11,20 +11,19 @@ from data import *
 from utils import *
 from plots import *
 
-if 'my_team_df' not in st.session_state:
-    my_team = get_league_settings(st.session_state['r_json'])['my_team_id']
-    st.session_state['my_team_df'] = load_and_process_data(
-        r_json=st.session_state['r_json'],
-        filter_column='tid',
-        filter_values=[my_team])[0]
+# Use centralized data from session state
+if 'full_df' not in st.session_state:
+    st.error('Please upload a JSON file first')
+    st.stop()
 
-df = st.session_state['my_team_df'].copy()
+my_team_id = st.session_state['league_settings']['my_team_id']
+df = st.session_state['full_df'][st.session_state['full_df']['tid'] == my_team_id]
 
 # Perform calculations
 df['cap_value'] = df['cap_value_prog'].apply(lambda x: sum(x.values()))
 df['value'] = df['value'].round(2)
 df['rk'] = df['value'].rank(ascending=False, method='dense').astype(int)
-df['info'] = df['pos'] + ' / ' + df['player']
+df['info'] = df['pos'].astype(str) + ' / ' + df['player']
 df['ratings'] = df['age'].astype(str) + ' / ' + df['ovr'].astype(str) + ' / ' + df['pot'].astype(str)
 
 # Add a checkbox column for drafted players

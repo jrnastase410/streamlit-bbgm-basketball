@@ -51,6 +51,7 @@ def apply_model_predictions(df, models_dir="models/ovr"):
     return df
 
 
+@st.cache_data(show_spinner="Processing league data...")
 def load_and_process_data(
     r_json,
     keep=["ratings", "salaries"],
@@ -75,12 +76,11 @@ def load_and_process_data(
     df = calculate_salary_projections(df, league_settings, inflation_factor)
     df = calculate_cap_hits(df)
     df = predict_cap_hits(df)
-    df["cap_hits_filled"] = df.apply(
-        lambda row: fill_cap_hits(
-            row["cap_hits"], row["cap_hits_prog"], inflation_factor
-        ),
-        axis=1,
-    )
+    # Vectorized fill_cap_hits
+    df["cap_hits_filled"] = [
+        fill_cap_hits(cap_hits, cap_hits_prog, inflation_factor)
+        for cap_hits, cap_hits_prog in zip(df["cap_hits"], df["cap_hits_prog"])
+    ]
     df = calculate_surplus(df)
     df = scale_surplus(df, scale_factor)
     df = sum_values(df)
